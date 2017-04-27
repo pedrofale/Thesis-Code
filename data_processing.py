@@ -8,17 +8,22 @@ usable pattern matrix and a corresponding label vector
 @author: pedro
 """
 
+import sys
 import csv
 import numpy as np
 import os
 import gzip
 
+if len(sys.argv) != 4:
+    print "Invalid arguments."
+    sys.exit()
 
 ####################################################################
 # DATA INFO                                                        
 num_genes = 60483
-metadata_filename = '/home/pedro/IST/IIEEC/TCGA/File_metadata.csv'
-data_path = '/home/pedro/IST/IIEEC/TCGA/brca_data/'
+metadata_filename = sys.argv[1] #'/home/pedro/IST/IIEEC/TCGA/File_metadata.csv'
+data_path = sys.argv[2] #'/home/pedro/IST/IIEEC/TCGA/brca_data/'
+matrices_directory = sys.argv[3]
 ####################################################################
 
 "Function to search for a file in directory and subdirectories"
@@ -27,8 +32,14 @@ def find(name, path):
         if name in files:
             return os.path.join(root, name)
 
+# Convert the .txt to .csv to make the process easier
+in_txt = csv.reader(open(metadata_filename, "rb"), delimiter = '\t')
+metadata_filename_csv = r"metadata_csv.csv"
+metadata_csv = csv.writer(open(metadata_filename_csv, 'wb'))
+metadata_csv.writerows(in_txt)
+
 with open(metadata_filename, 'r') as fp:
-    reader = csv.reader(fp, delimiter=',', quotechar='"')
+    reader = csv.reader(fp, delimiter='\t', quotechar='"')
     next(reader, None)  # skip the headers
     metadata = [row for row in reader]
 
@@ -50,15 +61,6 @@ for i in range(labels.size):
         labels[i] = 1
     elif labels[i] == "Metastatic":
         labels[i] = 2
-        
-# Describe the data
-unique, counts = np.unique(labels, return_counts=True)
-
-print "Total: ", labels.size, "\tsamples"
-print "Sample types:"
-print "\t", counts[0], "\tnormal tissue samples"
-print "\t", counts[1], "\tprimary tumor samples"
-print "\t", counts[2], "\tmetastatic samples"
 
 ####################################################################
 # PATTERNS MATRIX                                                  #
@@ -75,7 +77,7 @@ for filename in filenames:
     # Open the file <filename>
     print "Searching for file ", filename, "..."
     curr_file = find(filename, data_path)
-    print "done."
+    print "found."
     with gzip.open(curr_file, 'rb') as f:
         file_content = f.read()
         
@@ -89,7 +91,30 @@ for filename in filenames:
         line_vector = line.strip().split('\t')
         patterns[i, j] = line_vector[1]
         j = j + 1        
-    print "done."        
+    print "inserted."        
     
     i = i + 1
     
+
+####################################################################
+# DESCRIBE THE DATA                                                #
+####################################################################
+unique, counts = np.unique(labels, return_counts=True)
+
+print "Total: ", labels.size, "\tsamples"
+print "Sample types:"
+print "\t", counts[0], "\tnormal tissue samples"
+print "\t", counts[1], "\tprimary tumor samples"
+print "\t", counts[2], "\tmetastatic samples"
+    
+####################################################################
+# SAVE THE DATA                                                    #
+####################################################################
+
+print "Saving data arrays into " + matrices_directory + "..."
+np.save(matrices_directory + 'brca-labels.npy', labels)    
+np.save(matrices_directory + 'brca-patterns.npy', patterns)
+    
+# To read later:
+# labels = np.load(matrices_directory + 'brca-labels.npy')    
+# patterns = np.load(matrices_directory + 'brca-patterns.npy')    
