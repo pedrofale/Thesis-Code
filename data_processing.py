@@ -13,13 +13,21 @@ import numpy as np
 import os
 import gzip
 
+
+####################################################################
+# DATA INFO                                                        
+num_genes = 60483
+metadata_filename = '/home/pedro/IST/IIEEC/TCGA/File_metadata.csv'
+data_path = '/home/pedro/IST/IIEEC/TCGA/brca_data/'
+####################################################################
+
 "Function to search for a file in directory and subdirectories"
 def find(name, path):
     for root, dirs, files in os.walk(path):
         if name in files:
             return os.path.join(root, name)
 
-with open('/home/pedro/IST/IIEEC/TCGA/File_metadata.csv', 'r') as fp:
+with open(metadata_filename, 'r') as fp:
     reader = csv.reader(fp, delimiter=',', quotechar='"')
     next(reader, None)  # skip the headers
     metadata = [row for row in reader]
@@ -60,13 +68,13 @@ print "\t", counts[2], "\tmetastatic samples"
 filenames = metadata_array[:, 5]
 
 # Initialize the patterns matrix
-patterns = np.zeros((num_samples, 60483))
+patterns = np.zeros((num_samples, num_genes))
 
 i = 0
 for filename in filenames:
     # Open the file <filename>
     print "Searching for file ", filename, "..."
-    curr_file = find(filename, '/home/pedro/IST/IIEEC/TCGA/brca_data/')
+    curr_file = find(filename, data_path)
     print "done."
     with gzip.open(curr_file, 'rb') as f:
         file_content = f.read()
