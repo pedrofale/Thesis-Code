@@ -153,8 +153,6 @@ class dA(object):
                 ),
                 dtype=theano.config.floatX
             )
-            print("Hello!")
-            print(initial_W)
             W = theano.shared(value=initial_W, name='W', borrow=True)
 
         if not bvis:
