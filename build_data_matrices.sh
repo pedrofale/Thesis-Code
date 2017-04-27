@@ -13,7 +13,7 @@ datafiles_directory='/home/pedro/IST/IIEEC/TCGA/brca_data/'
 
 datamatrices_directory='/home/pedro/IST/IIEEC/TCGA/'
 
-# Create a payload.txt file containing a query for GDC, according to https://docs.gdc.cancer.gov/API/Users_Guide/Search_and_Retrieval/
+# Create a payload.txt file containing a query for GDC, according to https://docs.gdc.cancer.gov/API/Users_Guide/Search_and_Retrieval/#request-parameters
 python uuid_to_barcode.py $manifest_directory $manifest_filename
 
 # Query GDC to get a file file_metadata.txt containing the information about each sample 
