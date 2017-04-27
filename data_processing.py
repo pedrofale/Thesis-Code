@@ -2,6 +2,9 @@
 """
 Created on Thu Apr 27 11:16:02 2017
 
+This script transforms the data from the TCGA-BRCA project into a
+usable pattern matrix and a corresponding label vector
+
 @author: pedro
 """
 
