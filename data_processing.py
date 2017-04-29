@@ -51,15 +51,15 @@ num_samples = metadata_array.shape[0]
 # LABELS VECTOR                                                    #
 ####################################################################
 # We only want the sample types
-labels = metadata_array[:, 2]
-
+labels_str = metadata_array[:, 2]
+labels = np.zeros((num_samples, 1))
 # Use integers as class labels
-for i in range(labels.size):
-    if labels[i] == "Solid Tissue Normal":
+for i in range(labels_str.size):
+    if labels_str[i] == "Solid Tissue Normal":
         labels[i] = 0
-    elif labels[i] == "Primary Tumor":
+    elif labels_str[i] == "Primary Tumor":
         labels[i] = 1
-    elif labels[i] == "Metastatic":
+    elif labels_str[i] == "Metastatic":
         labels[i] = 2
 
 ####################################################################
@@ -95,6 +95,12 @@ for filename in filenames:
     
     i = i + 1
     
+# Remove genes which have 0 expression value for all samples
+zero_genes = np.where((~patterns.any(axis=0)))[0]
+print "Total of ", patterns.shape[1], "\tgenes"
+print "Removing ", zero_genes.size, "\tgenes without expression for any sample..."
+patterns = np.delete(patterns, zero_genes, axis = 1)
+print "removed."
 
 ####################################################################
 # DESCRIBE THE DATA                                                #
@@ -114,7 +120,8 @@ print "\t", counts[2], "\tmetastatic samples"
 print "Saving data arrays into " + matrices_directory + "..."
 np.save(matrices_directory + 'brca-labels.npy', labels)    
 np.save(matrices_directory + 'brca-patterns.npy', patterns)
-    
+print "Succesfully saved the numpy arrays brca-labels.npy and brca-labels.npy."   
+
 # To read later:
 # labels = np.load(matrices_directory + 'brca-labels.npy')    
 # patterns = np.load(matrices_directory + 'brca-patterns.npy')    
