@@ -38,11 +38,11 @@ sm = SMOTE(random_state=42)
 # Prepare the SDA
 from SDA_tutorial_theano import SdA
 batch_size = 1
-hidden_layers_sizes= [500] 
+hidden_layers_sizes= [100] 
 corruption_levels = [.3]
 pretrain_lr=0.001
 finetune_lr=0.1
-pretraining_epochs=15
+pretraining_epochs=1
 training_epochs=1000
 visible_units = normalized_data.shape[1]
 
@@ -67,14 +67,17 @@ for train_index, test_index in fold_splits:
     train_valid_labels = labels[train_index]
     x_train, x_valid, y_train, y_valid = train_test_split(train_valid_data, 
                                                           train_valid_labels, test_size=0.2, random_state=42)
+   
+    np.save('/home/ubuntu/temp_data/x_train_' + str(j), x_train)
+    np.save('/home/ubuntu/temp_data/y_train_' + str(j), y_train)
     #######################################
     # OVERSAMPLING THE DATA TRAINING DATA #
     #######################################
     print('Oversampling the training set...')
     ## Oversample the training set ###
     x_train_sm, y_train_sm = sm.fit_sample(x_train, y_train.ravel())
-    np.save('/home/ubuntu/temp_data/x_train_' + str(j), x_train)
-    np.save('/home/ubuntu/temp_data/y_train_' + str(j), y_train)
+    np.save('/home/ubuntu/temp_data/x_train_sm_' + str(j), x_train_sm)
+    np.save('/home/ubuntu/temp_data/y_train_sm_' + str(j), y_train_sm)
     np.save('/home/ubuntu/temp_data/x_valid_' + str(j), x_valid)
     np.save('/home/ubuntu/temp_data/y_valid_' + str(j), y_valid)
     np.save('/home/ubuntu/temp_data/x_test_' + str(j), normalized_data[test_index])    
@@ -89,14 +92,14 @@ del normalized_data
 for j in range(k):
     print('--- iteration no. %d ---' %(j+1))
         
-    x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_' + str(j) + '.npy'), 
-                                              np.load('/home/ubuntu/temp_data/y_train_' + str(j) + '.npy'))
+    x_train_sm, y_train_sm = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_sm_' + str(j) + '.npy'), 
+                                              np.load('/home/ubuntu/temp_data/y_train_sm_' + str(j) + '.npy'))
       
     ######################
     # BUILDING THE MODEL #
     ######################
     print('building SDA...')
-    numpy_rng = np.random.RandomState(89677+j)
+    numpy_rng = np.random.RandomState(np.random.randint(0, 10000))
     sda = SdA(
         numpy_rng=numpy_rng,
         n_ins=visible_units,
@@ -104,7 +107,7 @@ for j in range(k):
         n_outs=2
     )
     
-    n_train_batches = x_train.get_value(borrow=True).shape[0]
+    n_train_batches = x_train_sm.get_value(borrow=True).shape[0]
     n_train_batches //= batch_size
     
     #########################
@@ -112,7 +115,7 @@ for j in range(k):
     #########################
     print('getting the pretraining functions...')
     
-    pretraining_fns = sda.pretraining_functions(train_set_x=x_train,
+    pretraining_fns = sda.pretraining_functions(train_set_x=x_train_sm,
                                                 batch_size=batch_size)
 
     print('pre-training the SDA...')
@@ -134,10 +137,12 @@ for j in range(k):
     ########################
     # get the training, validation and testing function for the model
     print('getting the finetuning functions...')
+    x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_' + str(j) + '.npy'), 
+                                              np.load('/home/ubuntu/temp_data/y_train_' + str(j) + '.npy'))
     x_valid, y_valid = shared_dataset(np.load('/home/ubuntu/temp_data/x_valid_' + str(j) + '.npy'), 
                                               np.load('/home/ubuntu/temp_data/y_valid_' + str(j) + '.npy'))
-    x_test, y_test = shared_dataset(np.load('/home/ubuntu/temp_data/x_test_' + str(i) + '.npy'), 
-                                              np.load('/home/ubuntu/temp_data/y_test_' + str(i) + '.npy'))
+    x_test, y_test = shared_dataset(np.load('/home/ubuntu/temp_data/x_test_' + str(j) + '.npy'), 
+                                              np.load('/home/ubuntu/temp_data/y_test_' + str(j) + '.npy'))
     datasets = [(x_train, y_train.flatten()), (x_valid, y_valid.flatten()), (x_test, y_test.flatten())]    
     
     train_fn, validate_model, test_model = sda.build_finetune_functions(
@@ -175,9 +180,9 @@ for j in range(k):
             if (iter + 1) % validation_frequency == 0:
                 validation_losses = validate_model()
                 this_validation_loss = np.mean(validation_losses, dtype='float64')
-                print('epoch %i, minibatch %i/%i, validation error %f %%' %
+                print('epoch %i, minibatch %i/%i, validation error %f %%, training cost %f' %
                       (epoch, minibatch_index + 1, n_train_batches,
-                       this_validation_loss * 100.))
+                       this_validation_loss * 100., minibatch_avg_cost))
 
                 # if we got the best validation score until now
                 if this_validation_loss < best_validation_loss:
@@ -209,11 +214,9 @@ for j in range(k):
     # USING FEATURES ON A CLASSIFIER #
     ##################################
     print('training decision tree...')
-    ### Train a decision tree classifier on SDA features of oversampled data ###
-    x_train_data = np.load('/home/ubuntu/temp_data/x_train_' + str(j) + '.npy', mmap_mode='r')
-    y_train_data = np.load('/home/ubuntu/temp_data/y_train_' + str(j) + '.npy', mmap_mode='r')
-    clf_da = clf_da.fit(sda.get_hidden_values(x_train_data).eval(), y_train_data)
-    del x_train_data, y_train_data
+    ### Train a decision tree classifier on SDA features of original data ###
+    clf_da = clf_da.fit(sda.get_hidden_values(x_train).eval(), y_train)
+    del x_train, y_train
     
     ### Evaluate the classifier with SDA features ###
     print('evaluating decision tree...')
@@ -223,7 +226,7 @@ for j in range(k):
     del x_test
     acc_scores[0, j] = accuracy_score(prediction, y_test)
     prc_scores[0, j] = precision_score(prediction, y_test)
-    f1_scores[0, j] = f1_score(prediction, y_test)    
+    f1_scores[0, j] = f1_score(prediction, y_test)
     del y_test
     
 print("SDA (%i layer(s), %0.2f corruption level) performance:" % (len(hidden_layers_sizes), corruption_levels[0]))
