@@ -12,8 +12,8 @@ import numpy as np
 from utils import shared_dataset
 
 # Load the data
-patterns = np.load('/home/ubuntu/Thesis-Scripts/data/brca-patterns.npy')
-labels = np.load('/home/ubuntu/Thesis-Scripts/data/brca-labels.npy')
+patterns = np.load('/home/ubuntu/Thesis-Scripts/EC2/data/brca-patterns.npy')
+labels = np.load('/home/ubuntu/Thesis-Scripts/EC2/data/brca-labels.npy')
 
 # Remove metastatic patterns
 metastatic_patterns_idx = np.where((labels == 2))[0]
