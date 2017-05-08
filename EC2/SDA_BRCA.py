@@ -38,8 +38,8 @@ sm = SMOTE(random_state=42)
 # Prepare the SDA
 from SDA_tutorial_theano import SdA
 batch_size = 1
-hidden_layers_sizes= [10000, 5000, 2000, 500] 
-corruption_levels = [.3, .3, .3, .3]
+hidden_layers_sizes= [500] 
+corruption_levels = [.3]
 pretrain_lr=0.001
 finetune_lr=0.1
 pretraining_epochs=15
@@ -86,18 +86,17 @@ del x_train, x_train_sm, x_valid, y_train, y_train_sm, y_valid, train_valid_data
 
 del normalized_data
 
-i = 0
-for i in range(k):
-    print('--- iteration no. %d ---' %(i+1))
+for j in range(k):
+    print('--- iteration no. %d ---' %(j+1))
         
-    x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_' + str(i) + '.npy'), 
-                                              np.load('/home/ubuntu/temp_data/y_train_' + str(i) + '.npy'))
+    x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_' + str(j) + '.npy'), 
+                                              np.load('/home/ubuntu/temp_data/y_train_' + str(j) + '.npy'))
       
     ######################
     # BUILDING THE MODEL #
     ######################
     print('building SDA...')
-    numpy_rng = np.random.RandomState(89677)
+    numpy_rng = np.random.RandomState(89677+j)
     sda = SdA(
         numpy_rng=numpy_rng,
         n_ins=visible_units,
@@ -135,8 +134,8 @@ for i in range(k):
     ########################
     # get the training, validation and testing function for the model
     print('getting the finetuning functions...')
-    x_valid, y_valid = shared_dataset(np.load('/home/ubuntu/temp_data/x_valid_' + str(i) + '.npy'), 
-                                              np.load('/home/ubuntu/temp_data/y_valid_' + str(i) + '.npy'))
+    x_valid, y_valid = shared_dataset(np.load('/home/ubuntu/temp_data/x_valid_' + str(j) + '.npy'), 
+                                              np.load('/home/ubuntu/temp_data/y_valid_' + str(j) + '.npy'))
     x_test, y_test = shared_dataset(np.load('/home/ubuntu/temp_data/x_test_' + str(i) + '.npy'), 
                                               np.load('/home/ubuntu/temp_data/y_test_' + str(i) + '.npy'))
     datasets = [(x_train, y_train.flatten()), (x_valid, y_valid.flatten()), (x_test, y_test.flatten())]    
@@ -211,8 +210,8 @@ for i in range(k):
     ##################################
     print('training decision tree...')
     ### Train a decision tree classifier on SDA features of oversampled data ###
-    x_train_data = np.load('/home/ubuntu/temp_data/x_train_' + str(i) + '.npy', mmap_mode='r')
-    y_train_data = np.load('/home/ubuntu/temp_data/y_train_' + str(i) + '.npy', mmap_mode='r')
+    x_train_data = np.load('/home/ubuntu/temp_data/x_train_' + str(j) + '.npy', mmap_mode='r')
+    y_train_data = np.load('/home/ubuntu/temp_data/y_train_' + str(j) + '.npy', mmap_mode='r')
     clf_da = clf_da.fit(sda.get_hidden_values(x_train_data).eval(), y_train_data)
     del x_train_data, y_train_data
     
@@ -222,14 +221,12 @@ for i in range(k):
     y_test = np.load('/home/ubuntu/temp_data/y_test_' + str(i) + '.npy')
     prediction = clf_da.predict(sda.get_hidden_values(x_test).eval())
     del x_test
-    acc_scores[0, i] = accuracy_score(prediction, y_test)
-    prc_scores[0, i] = precision_score(prediction, y_test)
-    f1_scores[0, i] = f1_score(prediction, y_test)    
+    acc_scores[0, j] = accuracy_score(prediction, y_test)
+    prc_scores[0, j] = precision_score(prediction, y_test)
+    f1_scores[0, j] = f1_score(prediction, y_test)    
     del y_test
-        
-    i = i + 1
     
-print("SDA performance:")
+print("SDA (%i layer(s), %0.2f corruption level) performance:" % (len(hidden_layers_sizes), corruption_levels[0]))
 print("- accuracy: %0.5f (+/- %0.5f)" % (acc_scores.mean(), acc_scores.std() * 2))
 print("- precision: %0.5f (+/- %0.5f)" % (prc_scores.mean(), prc_scores.std() * 2))
 print("- F1: %0.5f (+/- %0.5f)" % (f1_scores.mean(), f1_scores.std() * 2))
