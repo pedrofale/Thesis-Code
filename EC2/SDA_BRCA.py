@@ -48,12 +48,16 @@ visible_units = normalized_data.shape[1]
 
 # Prepare the classifiers
 from sklearn import tree
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
 from sklearn.metrics import f1_score
 clf_pca = tree.DecisionTreeClassifier()
 clf_da = tree.DecisionTreeClassifier()
 
 # Arrays of scores
-scores_da = np.zeros((1, k))
+acc_scores = np.zeros((1, k))
+prc_scores = np.zeros((1, k))
+f1_scores = np.zeros((1, k))
 
 j = 0
 fold_splits = kf.split(normalized_data, labels)
@@ -218,9 +222,14 @@ for i in range(k):
     y_test = np.load('/home/ubuntu/temp_data/y_test_' + str(i) + '.npy')
     prediction = clf_da.predict(sda.get_hidden_values(x_test).eval())
     del x_test
-    scores_da[0, i] = f1_score(prediction, y_test)
+    acc_scores[0, i] = accuracy_score(prediction, y_test)
+    prc_scores[0, i] = precision_score(prediction, y_test)
+    f1_scores[0, i] = f1_score(prediction, y_test)    
     del y_test
         
     i = i + 1
     
-print("SDA accuracy: %0.5f (+/- %0.5f)" % (scores_da.mean(), scores_da.std() * 2))
+print("SDA performance:")
+print("- accuracy: %0.5f (+/- %0.5f)" % (acc_scores.mean(), acc_scores.std() * 2))
+print("- precision: %0.5f (+/- %0.5f)" % (prc_scores.mean(), prc_scores.std() * 2))
+print("- F1: %0.5f (+/- %0.5f)" % (f1_scores.mean(), f1_scores.std() * 2))
