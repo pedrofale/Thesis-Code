@@ -38,7 +38,7 @@ sm = SMOTE(random_state=42)
 # Prepare the SDA
 from SDA_tutorial_theano import SdA
 batch_size = 1
-hidden_layers_sizes= [15000, 10000, 2000, 500] 
+hidden_layers_sizes= [10000, 5000, 2000, 500] 
 corruption_levels = [.3, .3, .3, .3]
 pretrain_lr=0.001
 finetune_lr=0.1
