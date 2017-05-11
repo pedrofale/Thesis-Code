@@ -24,6 +24,8 @@ del metastatic_patterns_idx
 # to use the cross-entropy loss function, the input data must belong
 # to the interval [0,1] (on each dimension)
 normalized_data = patterns / np.linalg.norm(patterns)
+from sklearn.preprocessing import normalize
+normalized_data = normalize(patterns)
 del patterns
 
 # Do K-Fold cross-validation
@@ -33,16 +35,17 @@ kf = KFold(n_splits=k, shuffle=True, random_state=42)
 
 # Prepare oversampling via SMOTE
 from imblearn.over_sampling import SMOTE
+from sklearn.utils import shuffle
 sm = SMOTE(random_state=42)
 
 # Prepare the SDA
 from SDA_tutorial_theano import SdA
 batch_size = 1
-hidden_layers_sizes= [100] 
-corruption_levels = [.3]
-pretrain_lr=0.001
-finetune_lr=0.1
-pretraining_epochs=1
+hidden_layers_sizes= [2000, 500] 
+corruption_levels = [.3, .3]
+pretrain_lr=0.1
+finetune_lr=0.01
+pretraining_epochs=10
 training_epochs=1000
 visible_units = normalized_data.shape[1]
 
@@ -76,8 +79,10 @@ for train_index, test_index in fold_splits:
     print('Oversampling the training set...')
     ## Oversample the training set ###
     x_train_sm, y_train_sm = sm.fit_sample(x_train, y_train.ravel())
+    # shuffle the oversampled to make it more uniform
+    x_train_sm, y_train_sm = shuffle(x_train_sm, y_train_sm, random_state=42)
     np.save('/home/ubuntu/temp_data/x_train_sm_' + str(j), x_train_sm)
-    np.save('/home/ubuntu/temp_data/y_train_sm_' + str(j), y_train_sm)
+    np.save('/home/ubuntu/temp_data/y_train_sm_' + str(j), np.reshape(y_train_sm, (y_train_sm.shape[0], 1)))
     np.save('/home/ubuntu/temp_data/x_valid_' + str(j), x_valid)
     np.save('/home/ubuntu/temp_data/y_valid_' + str(j), y_valid)
     np.save('/home/ubuntu/temp_data/x_test_' + str(j), normalized_data[test_index])    
@@ -137,21 +142,27 @@ for j in range(k):
     ########################
     # get the training, validation and testing function for the model
     print('getting the finetuning functions...')
-    x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_' + str(j) + '.npy'), 
-                                              np.load('/home/ubuntu/temp_data/y_train_' + str(j) + '.npy'))
+    x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_sm_' + str(j) + '.npy'), 
+                                              np.load('/home/ubuntu/temp_data/y_train_sm_' + str(j) + '.npy'))
     x_valid, y_valid = shared_dataset(np.load('/home/ubuntu/temp_data/x_valid_' + str(j) + '.npy'), 
                                               np.load('/home/ubuntu/temp_data/y_valid_' + str(j) + '.npy'))
     x_test, y_test = shared_dataset(np.load('/home/ubuntu/temp_data/x_test_' + str(j) + '.npy'), 
                                               np.load('/home/ubuntu/temp_data/y_test_' + str(j) + '.npy'))
     datasets = [(x_train, y_train.flatten()), (x_valid, y_valid.flatten()), (x_test, y_test.flatten())]    
-    
+ 
     train_fn, validate_model, test_model = sda.build_finetune_functions(
         datasets=datasets,
         batch_size=batch_size,
         learning_rate=finetune_lr
     )
+    n_train_batches = x_train.eval().shape[0]
+    n_train_batches //= batch_size
 
     print('finetunning the model...')
+    valid_no_0 = len(np.where((y_valid.eval() == 0))[0])
+    valid_no_1 = len(np.where((y_valid.eval() == 1))[0])
+    valid_total = valid_no_0 + valid_no_1
+    print('Bad results: %f or %f in validation set' % (valid_no_0/valid_total * 100.0, valid_no_1/valid_total * 100.0))
     # early-stopping parameters
     patience = 10 * n_train_batches  # look as this many examples regardless
     patience_increase = 2.  # wait this much longer when a new best is
@@ -170,10 +181,11 @@ for j in range(k):
 
     done_looping = False
     epoch = 0
-
     while (epoch < training_epochs) and (not done_looping):
+        i=0
         epoch = epoch + 1
         for minibatch_index in range(n_train_batches):
+            i = i + 1
             minibatch_avg_cost = train_fn(minibatch_index)
             iter = (epoch - 1) * n_train_batches + minibatch_index
 
@@ -215,13 +227,13 @@ for j in range(k):
     ##################################
     print('training decision tree...')
     ### Train a decision tree classifier on SDA features of original data ###
-    clf_da = clf_da.fit(sda.get_hidden_values(x_train).eval(), y_train)
+    clf_da = clf_da.fit(sda.get_hidden_values(x_train).eval(), y_train.eval())
     del x_train, y_train
     
     ### Evaluate the classifier with SDA features ###
     print('evaluating decision tree...')
-    x_test = np.load('/home/ubuntu/temp_data/x_test_' + str(i) + '.npy')
-    y_test = np.load('/home/ubuntu/temp_data/y_test_' + str(i) + '.npy')
+    x_test = np.load('/home/ubuntu/temp_data/x_test_' + str(j) + '.npy')
+    y_test = np.load('/home/ubuntu/temp_data/y_test_' + str(j) + '.npy')
     prediction = clf_da.predict(sda.get_hidden_values(x_test).eval())
     del x_test
     acc_scores[0, j] = accuracy_score(prediction, y_test)
