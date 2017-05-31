@@ -63,7 +63,7 @@ finetune_lr=0.5
 pretraining_epochs=10
 training_epochs=1000
 visible_units = normalized_data.shape[1]
-
+finetune = False
 # Prepare the classifiers
 from sklearn import tree
 from sklearn.metrics import accuracy_score
@@ -151,93 +151,94 @@ for j in range(k):
                          corruption=corruption_levels[i],
                          lr=pretrain_lr))
             print('Pre-training layer %i, epoch %d, cost %f' % (i, epoch, np.mean(c, dtype='float64')))    
-    
-    ########################
-    # FINETUNING THE MODEL #
-    ########################
-    # get the training, validation and testing function for the model
-    print('getting the finetuning functions...')
-    x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_sm_' + str(j) + '.npy'), 
-                                              np.load('/home/ubuntu/temp_data/y_train_sm_' + str(j) + '.npy'))
-    x_valid, y_valid = shared_dataset(np.load('/home/ubuntu/temp_data/x_valid_' + str(j) + '.npy'), 
-                                              np.load('/home/ubuntu/temp_data/y_valid_' + str(j) + '.npy'))
-    x_test, y_test = shared_dataset(np.load('/home/ubuntu/temp_data/x_test_' + str(j) + '.npy'), 
-                                              np.load('/home/ubuntu/temp_data/y_test_' + str(j) + '.npy'))
-    datasets = [(x_train, y_train.flatten()), (x_valid, y_valid.flatten()), (x_test, y_test.flatten())]    
- 
-    train_fn, validate_model, test_model = sda.build_finetune_functions(
-        datasets=datasets,
-        batch_size=batch_size,
-        learning_rate=finetune_lr
-    )
-    n_train_batches = x_train.eval().shape[0]
-    n_train_batches //= batch_size
 
-    print('finetunning the model...')
-    valid_no_0 = len(np.where((y_valid.eval() == 0))[0])
-    valid_no_1 = len(np.where((y_valid.eval() == 1))[0])
-    valid_total = valid_no_0 + valid_no_1
-    print('Bad results: %f or %f in validation set' % (valid_no_0/valid_total * 100.0, valid_no_1/valid_total * 100.0))
-    # early-stopping parameters
-    patience = 10 * n_train_batches  # look as this many examples regardless
-    patience_increase = 2.  # wait this much longer when a new best is
-                            # found
-    improvement_threshold = 0.995  # a relative improvement of this much is
-                                   # considered significant
-    validation_frequency = min(n_train_batches, patience // 2)
-                                  # go through this many
-                                  # minibatche before checking the network
-                                  # on the validation set; in this case we
-                                  # check every epoch
+    if finetune == True:    
+        ########################
+        # FINETUNING THE MODEL #
+        ########################
+        # get the training, validation and testing function for the model
+        print('getting the finetuning functions...')
+        x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_sm_' + str(j) + '.npy'), 
+                                                  np.load('/home/ubuntu/temp_data/y_train_sm_' + str(j) + '.npy'))
+        x_valid, y_valid = shared_dataset(np.load('/home/ubuntu/temp_data/x_valid_' + str(j) + '.npy'), 
+                                                  np.load('/home/ubuntu/temp_data/y_valid_' + str(j) + '.npy'))
+        x_test, y_test = shared_dataset(np.load('/home/ubuntu/temp_data/x_test_' + str(j) + '.npy'), 
+                                                  np.load('/home/ubuntu/temp_data/y_test_' + str(j) + '.npy'))
+        datasets = [(x_train, y_train.flatten()), (x_valid, y_valid.flatten()), (x_test, y_test.flatten())]    
+     
+        train_fn, validate_model, test_model = sda.build_finetune_functions(
+            datasets=datasets,
+            batch_size=batch_size,
+            learning_rate=finetune_lr
+        )
+        n_train_batches = x_train.eval().shape[0]
+        n_train_batches //= batch_size
 
-    best_validation_loss = np.inf
-    test_score = 0.
-    start_time = timeit.default_timer()
+        print('finetunning the model...')
+        valid_no_0 = len(np.where((y_valid.eval() == 0))[0])
+        valid_no_1 = len(np.where((y_valid.eval() == 1))[0])
+        valid_total = valid_no_0 + valid_no_1
+        print('Bad results: %f or %f in validation set' % (valid_no_0/valid_total * 100.0, valid_no_1/valid_total * 100.0))
+        # early-stopping parameters
+        patience = 10 * n_train_batches  # look as this many examples regardless
+        patience_increase = 2.  # wait this much longer when a new best is
+                                # found
+        improvement_threshold = 0.995  # a relative improvement of this much is
+                                       # considered significant
+        validation_frequency = min(n_train_batches, patience // 2)
+                                      # go through this many
+                                      # minibatche before checking the network
+                                      # on the validation set; in this case we
+                                      # check every epoch
 
-    done_looping = False
-    epoch = 0
-    while (epoch < training_epochs) and (not done_looping):
-        i=0
-        epoch = epoch + 1
-        for minibatch_index in range(n_train_batches):
-            i = i + 1
-            minibatch_avg_cost = train_fn(minibatch_index)
-            iter = (epoch - 1) * n_train_batches + minibatch_index
+        best_validation_loss = np.inf
+        test_score = 0.
+        start_time = timeit.default_timer()
 
-            if (iter + 1) % validation_frequency == 0:
-                validation_losses = validate_model()
-                this_validation_loss = np.mean(validation_losses, dtype='float64')
-                print('epoch %i, minibatch %i/%i, validation error %f %%, training cost %f' %
-                      (epoch, minibatch_index + 1, n_train_batches,
-                       this_validation_loss * 100., minibatch_avg_cost))
+        done_looping = False
+        epoch = 0
+        while (epoch < training_epochs) and (not done_looping):
+            i=0
+            epoch = epoch + 1
+            for minibatch_index in range(n_train_batches):
+                i = i + 1
+                minibatch_avg_cost = train_fn(minibatch_index)
+                iter = (epoch - 1) * n_train_batches + minibatch_index
 
-                # if we got the best validation score until now
-                if this_validation_loss < best_validation_loss:
-
-                    #improve patience if loss improvement is good enough
-                    if (
-                        this_validation_loss < best_validation_loss *
-                        improvement_threshold
-                    ):
-                        patience = max(patience, iter * patience_increase)
-
-                    # save best validation score and iteration number
-                    best_validation_loss = this_validation_loss
-                    best_iter = iter
-
-                    # test it on the test set
-                    test_losses = test_model()
-                    test_score = np.mean(test_losses, dtype='float64')
-                    print(('     epoch %i, minibatch %i/%i, test error of '
-                           'best model %f %%') %
+                if (iter + 1) % validation_frequency == 0:
+                    validation_losses = validate_model()
+                    this_validation_loss = np.mean(validation_losses, dtype='float64')
+                    print('epoch %i, minibatch %i/%i, validation error %f %%, training cost %f' %
                           (epoch, minibatch_index + 1, n_train_batches,
-                           test_score * 100.))
+                           this_validation_loss * 100., minibatch_avg_cost))
 
-            if patience <= iter:
-                done_looping = True
-                break
+                    # if we got the best validation score until now
+                    if this_validation_loss < best_validation_loss:
 
-    del x_valid, y_valid
+                        #improve patience if loss improvement is good enough
+                        if (
+                            this_validation_loss < best_validation_loss *
+                            improvement_threshold
+                        ):
+                            patience = max(patience, iter * patience_increase)
+
+                        # save best validation score and iteration number
+                        best_validation_loss = this_validation_loss
+                        best_iter = iter
+
+                        # test it on the test set
+                        test_losses = test_model()
+                        test_score = np.mean(test_losses, dtype='float64')
+                        print(('     epoch %i, minibatch %i/%i, test error of '
+                               'best model %f %%') %
+                              (epoch, minibatch_index + 1, n_train_batches,
+                               test_score * 100.))
+
+                if patience <= iter:
+                    done_looping = True
+                    break
+
+        del x_valid, y_valid
     ##################################
     # USING FEATURES ON A CLASSIFIER #
     ##################################
