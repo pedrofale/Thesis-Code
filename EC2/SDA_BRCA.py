@@ -152,18 +152,19 @@ for j in range(k):
                          lr=pretrain_lr))
             print('Pre-training layer %i, epoch %d, cost %f' % (i, epoch, np.mean(c, dtype='float64')))    
 
-    if finetune == True:    
-        ########################
-        # FINETUNING THE MODEL #
-        ########################
-        # get the training, validation and testing function for the model
-        print('getting the finetuning functions...')
-        x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_sm_' + str(j) + '.npy'), 
-                                                  np.load('/home/ubuntu/temp_data/y_train_sm_' + str(j) + '.npy'))
-        x_valid, y_valid = shared_dataset(np.load('/home/ubuntu/temp_data/x_valid_' + str(j) + '.npy'), 
-                                                  np.load('/home/ubuntu/temp_data/y_valid_' + str(j) + '.npy'))
-        x_test, y_test = shared_dataset(np.load('/home/ubuntu/temp_data/x_test_' + str(j) + '.npy'), 
-                                                  np.load('/home/ubuntu/temp_data/y_test_' + str(j) + '.npy'))
+    ########################
+    # FINETUNING THE MODEL #
+    ########################
+    # get the training, validation and testing function for the model
+    print('getting the finetuning functions...')
+    x_train, y_train = shared_dataset(np.load('/home/ubuntu/temp_data/x_train_sm_' + str(j) + '.npy'), 
+                                              np.load('/home/ubuntu/temp_data/y_train_sm_' + str(j) + '.npy'))
+    x_valid, y_valid = shared_dataset(np.load('/home/ubuntu/temp_data/x_valid_' + str(j) + '.npy'), 
+                                              np.load('/home/ubuntu/temp_data/y_valid_' + str(j) + '.npy'))
+    x_test, y_test = shared_dataset(np.load('/home/ubuntu/temp_data/x_test_' + str(j) + '.npy'), 
+                                              np.load('/home/ubuntu/temp_data/y_test_' + str(j) + '.npy'))
+
+    if finetune == True:   
         datasets = [(x_train, y_train.flatten()), (x_valid, y_valid.flatten()), (x_test, y_test.flatten())]    
      
         train_fn, validate_model, test_model = sda.build_finetune_functions(
@@ -238,7 +239,7 @@ for j in range(k):
                     done_looping = True
                     break
 
-        del x_valid, y_valid
+    del x_valid, y_valid
     ##################################
     # USING FEATURES ON A CLASSIFIER #
     ##################################
