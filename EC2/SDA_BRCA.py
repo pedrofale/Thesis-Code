@@ -7,9 +7,24 @@ Created on Mon May  1 14:35:22 2017
 
 from __future__ import print_function
 import timeit
+import os
 
 import numpy as np
 from utils import shared_dataset
+
+# Remove cached data
+print('Removing cached data...')
+import os, shutil
+folder = '/home/ubuntu/temp_data'
+for the_file in os.listdir(folder):
+    file_path = os.path.join(folder, the_file)
+    try:
+        if os.path.isfile(file_path):
+            os.unlink(file_path)
+        #elif os.path.isdir(file_path): shutil.rmtree(file_path)
+    except Exception as e:
+        print(e)
+print('done')
 
 # Load the data
 patterns = np.load('/home/ubuntu/Thesis-Scripts/EC2/data/brca-patterns.npy')
@@ -41,10 +56,10 @@ sm = SMOTE(random_state=42)
 # Prepare the SDA
 from SDA_tutorial_theano import SdA
 batch_size = 1
-hidden_layers_sizes= [2000, 500] 
-corruption_levels = [.3, .3]
-pretrain_lr=0.1
-finetune_lr=0.01
+hidden_layers_sizes= [500] 
+corruption_levels = [0.0]
+pretrain_lr=0.001
+finetune_lr=0.5
 pretraining_epochs=10
 training_epochs=1000
 visible_units = normalized_data.shape[1]
@@ -221,7 +236,8 @@ for j in range(k):
             if patience <= iter:
                 done_looping = True
                 break
-    
+
+    del x_valid, y_valid
     ##################################
     # USING FEATURES ON A CLASSIFIER #
     ##################################
