@@ -56,26 +56,27 @@ sm = SMOTE(random_state=42)
 # Prepare the SDA
 from SDA_tutorial_theano import SdA
 batch_size = 1
-hidden_layers_sizes= [500] 
-corruption_levels = [0.0]
-pretrain_lr=0.001
+hidden_layers_sizes= [500, 500] 
+corruption_levels = [0., 0.]
+pretrain_lr=0.5
 finetune_lr=0.5
 pretraining_epochs=10
 training_epochs=1000
 visible_units = normalized_data.shape[1]
-finetune = False
+finetune = True
 # Prepare the classifiers
 from sklearn import tree
+from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import f1_score
-clf_pca = tree.DecisionTreeClassifier()
-clf_da = tree.DecisionTreeClassifier()
+clf_svm = SVC()
+clf_dt = tree.DecisionTreeClassifier()
 
 # Arrays of scores
-acc_scores = np.zeros((1, k))
-prc_scores = np.zeros((1, k))
-f1_scores = np.zeros((1, k))
+acc_scores = np.zeros((2, k))
+prc_scores = np.zeros((2, k))
+f1_scores = np.zeros((2, k))
 
 j = 0
 fold_splits = kf.split(normalized_data, labels)
@@ -245,21 +246,27 @@ for j in range(k):
     ##################################
     print('training decision tree...')
     ### Train a decision tree classifier on SDA features of original data ###
-    clf_da = clf_da.fit(sda.get_hidden_values(x_train).eval(), y_train.eval())
+    clf_dt = clf_dt.fit(sda.get_hidden_values(x_train).eval(), y_train.eval())
+    clf_svm = clf_svm.fit(sda.get_hidden_values(x_train).eval(), y_train.eval().ravel())
     del x_train, y_train
     
     ### Evaluate the classifier with SDA features ###
     print('evaluating decision tree...')
     x_test = np.load('/home/ubuntu/temp_data/x_test_' + str(j) + '.npy')
     y_test = np.load('/home/ubuntu/temp_data/y_test_' + str(j) + '.npy')
-    prediction = clf_da.predict(sda.get_hidden_values(x_test).eval())
+    dt_prediction = clf_dt.predict(sda.get_hidden_values(x_test).eval())
+    svm_prediction = clf_svm.predict(sda.get_hidden_values(x_test).eval())
     del x_test
-    acc_scores[0, j] = accuracy_score(prediction, y_test)
-    prc_scores[0, j] = precision_score(prediction, y_test)
-    f1_scores[0, j] = f1_score(prediction, y_test)
+    acc_scores[0, j] = accuracy_score(dt_prediction, y_test)
+    acc_scores[1, j] = accuracy_score(svm_prediction, y_test)
+    prc_scores[0, j] = precision_score(dt_prediction, y_test)
+    prc_scores[1, j] = precision_score(svm_prediction, y_test)
+    f1_scores[0, j] = f1_score(dt_prediction, y_test)
+    f1_scores[1, j] = f1_score(svm_prediction, y_test)
+    print("DT %0.5f acc, %0.5f prec, %0.5f f1" %(acc_scores[0,j],prc_scores[0,j],f1_scores[0,j]))
     del y_test
     
 print("SDA (%i layer(s), %0.2f corruption level) performance:" % (len(hidden_layers_sizes), corruption_levels[0]))
-print("- accuracy: %0.5f (+/- %0.5f)" % (acc_scores.mean(), acc_scores.std() * 2))
-print("- precision: %0.5f (+/- %0.5f)" % (prc_scores.mean(), prc_scores.std() * 2))
-print("- F1: %0.5f (+/- %0.5f)" % (f1_scores.mean(), f1_scores.std() * 2))
+print("- Accuracy: DT %0.5f (+/- %0.5f) || SVM-RBF %0.5f (+/- %0.5f)" % (acc_scores[0,:].mean(), acc_scores[0,:].std() * 2, acc_scores[1,:].mean(), acc_scores[1,:].std() * 2))
+print("- Precision: DT %0.5f (+/- %0.5f) || SVM-RBF %0.5f (+/- %0.5f)" % (prc_scores[0,:].mean(), prc_scores[0,:].std() * 2, prc_scores[1,:].mean(), prc_scores[1,:].std() * 2))
+print("- F1: DT %0.5f (+/- %0.5f) || SVM-RBF %0.5f (+/- %0.5f) " % (f1_scores[0,:].mean(), f1_scores[0,:].std() * 2, f1_scores[1,:].mean(), f1_scores[1,:].std() * 2))

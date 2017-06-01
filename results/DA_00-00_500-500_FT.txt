@@ -1,0 +1,191 @@
+Removing cached data...
+done
+Oversampling the training set...
+Oversampling the training set...
+Oversampling the training set...
+Oversampling the training set...
+--- iteration no. 1 ---
+building SDA...
+getting the pretraining functions...
+pre-training the SDA...
+Pre-training layer 0, epoch 0, cost 252.913268
+Pre-training layer 0, epoch 1, cost 139.478764
+Pre-training layer 0, epoch 2, cost 130.097353
+Pre-training layer 0, epoch 3, cost 125.295397
+Pre-training layer 0, epoch 4, cost 122.059934
+Pre-training layer 0, epoch 5, cost 119.990853
+Pre-training layer 0, epoch 6, cost 117.204973
+Pre-training layer 0, epoch 7, cost 114.655247
+Pre-training layer 0, epoch 8, cost 112.439254
+Pre-training layer 0, epoch 9, cost 110.740063
+Pre-training layer 1, epoch 0, cost 40.361425
+Pre-training layer 1, epoch 1, cost 38.340364
+Pre-training layer 1, epoch 2, cost 40.313043
+Pre-training layer 1, epoch 3, cost 41.391089
+Pre-training layer 1, epoch 4, cost 40.693124
+Pre-training layer 1, epoch 5, cost 40.129392
+Pre-training layer 1, epoch 6, cost 40.546061
+Pre-training layer 1, epoch 7, cost 42.209444
+Pre-training layer 1, epoch 8, cost 41.191271
+Pre-training layer 1, epoch 9, cost 40.772458
+getting the finetuning functions...
+finetunning the model...
+Bad results: 6.557377 or 93.442623 in validation set
+epoch 1, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000890
+     epoch 1, minibatch 1306/1306, test error of best model 91.447368 %
+epoch 2, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000165
+epoch 3, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000000
+epoch 4, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000177
+epoch 5, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000016
+epoch 6, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000005
+epoch 7, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000349
+epoch 8, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000114
+epoch 9, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000040
+epoch 10, minibatch 1306/1306, validation error 93.442623 %, training cost 0.000093
+training decision tree...
+evaluating decision tree...
+DT 0.99342 acc, 0.99640 prec, 0.99640 f1
+--- iteration no. 2 ---
+building SDA...
+getting the pretraining functions...
+pre-training the SDA...
+Pre-training layer 0, epoch 0, cost 152.732393
+Pre-training layer 0, epoch 1, cost 109.184922
+Pre-training layer 0, epoch 2, cost 105.174190
+Pre-training layer 0, epoch 3, cost 102.960706
+Pre-training layer 0, epoch 4, cost 101.632237
+Pre-training layer 0, epoch 5, cost 100.766724
+Pre-training layer 0, epoch 6, cost 100.058629
+Pre-training layer 0, epoch 7, cost 99.490766
+Pre-training layer 0, epoch 8, cost 99.099619
+Pre-training layer 0, epoch 9, cost 98.852257
+Pre-training layer 1, epoch 0, cost 133.017351
+Pre-training layer 1, epoch 1, cost 132.292914
+Pre-training layer 1, epoch 2, cost 132.404803
+Pre-training layer 1, epoch 3, cost 133.551270
+Pre-training layer 1, epoch 4, cost 134.141758
+Pre-training layer 1, epoch 5, cost 134.810587
+Pre-training layer 1, epoch 6, cost 135.336314
+Pre-training layer 1, epoch 7, cost 134.639612
+Pre-training layer 1, epoch 8, cost 134.834610
+Pre-training layer 1, epoch 9, cost 134.872238
+getting the finetuning functions...
+finetunning the model...
+Bad results: 6.010929 or 93.989071 in validation set
+epoch 1, minibatch 1300/1300, validation error 93.989071 %, training cost 0.003861
+     epoch 1, minibatch 1300/1300, test error of best model 92.105263 %
+epoch 2, minibatch 1300/1300, validation error 93.989071 %, training cost 0.000000
+epoch 3, minibatch 1300/1300, validation error 30.054645 %, training cost 0.000163
+     epoch 3, minibatch 1300/1300, test error of best model 26.315789 %
+epoch 4, minibatch 1300/1300, validation error 9.836066 %, training cost 0.000000
+     epoch 4, minibatch 1300/1300, test error of best model 6.907895 %
+epoch 5, minibatch 1300/1300, validation error 6.557377 %, training cost 0.001861
+     epoch 5, minibatch 1300/1300, test error of best model 5.592105 %
+epoch 6, minibatch 1300/1300, validation error 10.382514 %, training cost 0.000000
+epoch 7, minibatch 1300/1300, validation error 1.639344 %, training cost 0.002507
+     epoch 7, minibatch 1300/1300, test error of best model 1.315789 %
+epoch 8, minibatch 1300/1300, validation error 0.546448 %, training cost 0.000006
+     epoch 8, minibatch 1300/1300, test error of best model 0.657895 %
+epoch 9, minibatch 1300/1300, validation error 19.672131 %, training cost 0.000000
+epoch 10, minibatch 1300/1300, validation error 1.639344 %, training cost 0.000000
+epoch 11, minibatch 1300/1300, validation error 17.486339 %, training cost 0.000000
+epoch 12, minibatch 1300/1300, validation error 12.021858 %, training cost 0.000000
+epoch 13, minibatch 1300/1300, validation error 83.060109 %, training cost 0.000000
+epoch 14, minibatch 1300/1300, validation error 5.464481 %, training cost 0.000000
+epoch 15, minibatch 1300/1300, validation error 2.732240 %, training cost 0.000000
+training decision tree...
+evaluating decision tree...
+DT 0.98026 acc, 0.98214 prec, 0.98921 f1
+--- iteration no. 3 ---
+building SDA...
+getting the pretraining functions...
+pre-training the SDA...
+Pre-training layer 0, epoch 0, cost 152.439207
+Pre-training layer 0, epoch 1, cost 109.397568
+Pre-training layer 0, epoch 2, cost 105.459992
+Pre-training layer 0, epoch 3, cost 103.374652
+Pre-training layer 0, epoch 4, cost 102.013710
+Pre-training layer 0, epoch 5, cost 101.169908
+Pre-training layer 0, epoch 6, cost 100.583965
+Pre-training layer 0, epoch 7, cost 100.072451
+Pre-training layer 0, epoch 8, cost 99.565024
+Pre-training layer 0, epoch 9, cost 99.321988
+Pre-training layer 1, epoch 0, cost 132.087371
+Pre-training layer 1, epoch 1, cost 131.629612
+Pre-training layer 1, epoch 2, cost 131.521989
+Pre-training layer 1, epoch 3, cost 131.460538
+Pre-training layer 1, epoch 4, cost 132.165601
+Pre-training layer 1, epoch 5, cost 131.999606
+Pre-training layer 1, epoch 6, cost 132.243620
+Pre-training layer 1, epoch 7, cost 133.312454
+Pre-training layer 1, epoch 8, cost 132.531098
+Pre-training layer 1, epoch 9, cost 133.593074
+getting the finetuning functions...
+finetunning the model...
+Bad results: 7.650273 or 92.349727 in validation set
+epoch 1, minibatch 1324/1324, validation error 27.322404 %, training cost 0.002081
+     epoch 1, minibatch 1324/1324, test error of best model 23.684211 %
+epoch 2, minibatch 1324/1324, validation error 19.125683 %, training cost 0.008101
+     epoch 2, minibatch 1324/1324, test error of best model 16.776316 %
+epoch 3, minibatch 1324/1324, validation error 3.278689 %, training cost 0.001446
+     epoch 3, minibatch 1324/1324, test error of best model 3.289474 %
+epoch 4, minibatch 1324/1324, validation error 92.349727 %, training cost 0.000453
+epoch 5, minibatch 1324/1324, validation error 51.912568 %, training cost 0.000000
+epoch 6, minibatch 1324/1324, validation error 2.732240 %, training cost 0.002845
+     epoch 6, minibatch 1324/1324, test error of best model 3.289474 %
+epoch 7, minibatch 1324/1324, validation error 2.185792 %, training cost 0.000182
+     epoch 7, minibatch 1324/1324, test error of best model 3.618421 %
+epoch 8, minibatch 1324/1324, validation error 4.371585 %, training cost 0.000241
+epoch 9, minibatch 1324/1324, validation error 15.300546 %, training cost 0.000045
+epoch 10, minibatch 1324/1324, validation error 10.928962 %, training cost 0.000000
+epoch 11, minibatch 1324/1324, validation error 92.349727 %, training cost 0.000000
+epoch 12, minibatch 1324/1324, validation error 3.825137 %, training cost 0.000000
+epoch 13, minibatch 1324/1324, validation error 3.825137 %, training cost 0.000007
+training decision tree...
+evaluating decision tree...
+DT 0.97697 acc, 0.98524 prec, 0.98706 f1
+--- iteration no. 4 ---
+building SDA...
+getting the pretraining functions...
+pre-training the SDA...
+Pre-training layer 0, epoch 0, cost 229.866932
+Pre-training layer 0, epoch 1, cost 135.735258
+Pre-training layer 0, epoch 2, cost 129.202201
+Pre-training layer 0, epoch 3, cost 124.115889
+Pre-training layer 0, epoch 4, cost 119.340459
+Pre-training layer 0, epoch 5, cost 116.328125
+Pre-training layer 0, epoch 6, cost 114.728455
+Pre-training layer 0, epoch 7, cost 112.733839
+Pre-training layer 0, epoch 8, cost 110.928005
+Pre-training layer 0, epoch 9, cost 109.606084
+Pre-training layer 1, epoch 0, cost 47.107162
+Pre-training layer 1, epoch 1, cost 39.940601
+Pre-training layer 1, epoch 2, cost 42.332239
+Pre-training layer 1, epoch 3, cost 41.278959
+Pre-training layer 1, epoch 4, cost 41.100966
+Pre-training layer 1, epoch 5, cost 37.701390
+Pre-training layer 1, epoch 6, cost 37.616584
+Pre-training layer 1, epoch 7, cost 37.208237
+Pre-training layer 1, epoch 8, cost 37.195645
+Pre-training layer 1, epoch 9, cost 39.290735
+getting the finetuning functions...
+finetunning the model...
+Bad results: 9.289617 or 90.710383 in validation set
+epoch 1, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000749
+     epoch 1, minibatch 1326/1326, test error of best model 90.099010 %
+epoch 2, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000202
+epoch 3, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000004
+epoch 4, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000134
+epoch 5, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000293
+epoch 6, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000085
+epoch 7, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000138
+epoch 8, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000000
+epoch 9, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000000
+epoch 10, minibatch 1326/1326, validation error 90.710383 %, training cost 0.000000
+training decision tree...
+evaluating decision tree...
+DT 0.96700 acc, 0.98535 prec, 0.98175 f1
+SDA (2 layer(s), 0.00 corruption level) performance:
+- Accuracy: DT 0.97941 (+/- 0.01890) || SVM-RBF 0.72854 (+/- 0.74417)
+- Precision: DT 0.98728 (+/- 0.01084) || SVM-RBF 0.71986 (+/- 0.83145)
+- F1: DT 0.98861 (+/- 0.01051) || SVM-RBF 0.72620 (+/- 0.83898) 

@@ -1,0 +1,46 @@
+Removing cached data...
+done
+Oversampling the training set...
+Oversampling the training set...
+Oversampling the training set...
+Oversampling the training set...
+--- iteration no. 1 ---
+building SDA...
+getting the pretraining functions...
+pre-training the SDA...
+Pre-training layer 0, epoch 0, cost 212.175259
+Pre-training layer 0, epoch 1, cost 113.893098
+Pre-training layer 0, epoch 2, cost 108.567003
+Pre-training layer 0, epoch 3, cost 105.683569
+Pre-training layer 0, epoch 4, cost 104.642813
+Pre-training layer 0, epoch 5, cost 103.395182
+Pre-training layer 0, epoch 6, cost 102.585933
+Pre-training layer 0, epoch 7, cost 102.276497
+Pre-training layer 0, epoch 8, cost 101.739152
+Pre-training layer 0, epoch 9, cost 101.464700
+Pre-training layer 1, epoch 0, cost 135.517040
+Pre-training layer 1, epoch 1, cost 115.421095
+Pre-training layer 1, epoch 2, cost 116.955457
+Pre-training layer 1, epoch 3, cost 113.005857
+Pre-training layer 1, epoch 4, cost 110.291168
+Pre-training layer 1, epoch 5, cost 110.582809
+Pre-training layer 1, epoch 6, cost 109.921350
+Pre-training layer 1, epoch 7, cost 110.783087
+Pre-training layer 1, epoch 8, cost 110.662474
+Pre-training layer 1, epoch 9, cost 113.034579
+Pre-training layer 2, epoch 0, cost 24.715553
+Pre-training layer 2, epoch 1, cost 20.484667
+Pre-training layer 2, epoch 2, cost 20.035571
+Pre-training layer 2, epoch 3, cost 19.769712
+Pre-training layer 2, epoch 4, cost 19.520799
+Pre-training layer 2, epoch 5, cost 19.371445
+Pre-training layer 2, epoch 6, cost 19.292980
+Pre-training layer 2, epoch 7, cost 19.252554
+Pre-training layer 2, epoch 8, cost 19.204683
+Pre-training layer 2, epoch 9, cost 19.122501
+getting the finetuning functions...
+training decision tree...
+evaluating decision tree...
+DT 0.98355 acc, 0.98921 prec, 0.99099 f1
+--- iteration no. 2 ---
+building SDA...
