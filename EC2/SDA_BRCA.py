@@ -12,6 +12,9 @@ import os
 import numpy as np
 from utils import shared_dataset
 
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import GridSearchCV
+
 # Remove cached data
 print('Removing cached data...')
 import os, shutil
@@ -45,7 +48,7 @@ del patterns
 
 # Do K-Fold cross-validation
 from sklearn.model_selection import KFold
-k = 4
+k = 5
 kf = KFold(n_splits=k, shuffle=True, random_state=42)
 
 # Prepare oversampling via SMOTE
@@ -56,8 +59,8 @@ sm = SMOTE(random_state=42)
 # Prepare the SDA
 from SDA_tutorial_theano import SdA
 batch_size = 1
-hidden_layers_sizes= [500, 500] 
-corruption_levels = [0., 0.]
+hidden_layers_sizes= [10] 
+corruption_levels = [0.]
 pretrain_lr=0.5
 finetune_lr=0.5
 pretraining_epochs=10
@@ -247,6 +250,19 @@ for j in range(k):
     print('training decision tree...')
     ### Train a decision tree classifier on SDA features of original data ###
     clf_dt = clf_dt.fit(sda.get_hidden_values(x_train).eval(), y_train.eval())
+    # Grid search on the SVM-RBF parameters
+    print('finding parameters for SVM-RBF...')
+    C_range = np.logspace(-2, 10, 13)
+    gamma_range = np.logspace(-9, 3, 13)
+    param_grid = dict(gamma=gamma_range, C=C_range)
+    cv = StratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=42)
+    grid = GridSearchCV(SVC(), param_grid=param_grid, cv=cv)
+    grid.fit(sda.get_hidden_values(x_train).eval(), y_train.eval().ravel())
+    
+    print("...the best parameters are %s with a score of %0.2f"
+          % (grid.best_params_, grid.best_score_))
+    clf_svm = SVC(C=grid.best_params_["C"], gamma=grid.best_params_["gamma"])
+    print('training an SVM-RBF with optimal parameters...')
     clf_svm = clf_svm.fit(sda.get_hidden_values(x_train).eval(), y_train.eval().ravel())
     del x_train, y_train
     
@@ -255,6 +271,7 @@ for j in range(k):
     x_test = np.load('/home/ubuntu/temp_data/x_test_' + str(j) + '.npy')
     y_test = np.load('/home/ubuntu/temp_data/y_test_' + str(j) + '.npy')
     dt_prediction = clf_dt.predict(sda.get_hidden_values(x_test).eval())
+    print('evaluating decision tree...')
     svm_prediction = clf_svm.predict(sda.get_hidden_values(x_test).eval())
     del x_test
     acc_scores[0, j] = accuracy_score(dt_prediction, y_test)
@@ -264,9 +281,28 @@ for j in range(k):
     f1_scores[0, j] = f1_score(dt_prediction, y_test)
     f1_scores[1, j] = f1_score(svm_prediction, y_test)
     print("DT %0.5f acc, %0.5f prec, %0.5f f1" %(acc_scores[0,j],prc_scores[0,j],f1_scores[0,j]))
+    print("SVM-RBF %0.5f acc, %0.5f prec, %0.5f f1" %(acc_scores[1,j],prc_scores[1,j],f1_scores[1,j]))
     del y_test
+
+print("### All results: ###")
+print("\tAcc\tPrec\tF1")
+print("- DT:")
+for i in range(k):
+    print("It. 1: %0.5f\t%0.5f\t%0.5f" %(acc_scores[0,i],prc_scores[0,i],f1_scores[0,i]))
+print()
+print("\tAcc\tPrec\tF1")
+print("- SVM-RBF:")
+for i in range(k):
+    print("It. 1: %0.5f\t%0.5f\t%0.5f" %(acc_scores[1,i],prc_scores[1,i],f1_scores[1,i]))
+    
+print("\n####################################################\n")        
     
 print("SDA (%i layer(s), %0.2f corruption level) performance:" % (len(hidden_layers_sizes), corruption_levels[0]))
 print("- Accuracy: DT %0.5f (+/- %0.5f) || SVM-RBF %0.5f (+/- %0.5f)" % (acc_scores[0,:].mean(), acc_scores[0,:].std() * 2, acc_scores[1,:].mean(), acc_scores[1,:].std() * 2))
 print("- Precision: DT %0.5f (+/- %0.5f) || SVM-RBF %0.5f (+/- %0.5f)" % (prc_scores[0,:].mean(), prc_scores[0,:].std() * 2, prc_scores[1,:].mean(), prc_scores[1,:].std() * 2))
 print("- F1: DT %0.5f (+/- %0.5f) || SVM-RBF %0.5f (+/- %0.5f) " % (f1_scores[0,:].mean(), f1_scores[0,:].std() * 2, f1_scores[1,:].mean(), f1_scores[1,:].std() * 2))
+
+#import matplotlib.pyplot as plt
+#plt.figure()
+#plt.boxplot()
+#plt.title("SVM-RBF")
