@@ -1,440 +1,294 @@
 """
-Code for the BISCUIT model, 2016, Prabhakaran et al 2016
+Code for the BISCUIT model by Prabhakaran et al 2016
 http://proceedings.mlr.press/v48/prabhakaran16.html
 """
 
 # Author: Pedro Ferreira
 
-import torch
-import torch.optim as optim
-import torch.nn as nn
-from torch.autograd import Variable
-import torch.autograd as autograd
-
+import sys
 import numpy as np
-
-from models.networks import DefaultMLP
-from models.utils import to_gpu, var_to_numpy, numpy_to_var
-from models.losses import d_loss, g_loss
-from data.utils import get_batch
+from scipy.stats import multivariate_normal, wishart, invgamma, invwishart, dirichlet, gamma, norm
 
 
 class Biscuit(object):
     """
-    This class allows for the training of Generative Adversarial Networks in their most basic form. It is designed to be
-    as versatile as possible. Although the class can be instantiated with default parameters, it is fully customizable:
-    you can use any generator, discriminator, optimizers and latent space. Currently, there are four loss functions
-    available, corresponding to different "flavour" keyword arguments: 'x_entropy', 'least_squares', 'wasserstein' and
-    'wasserstein-gp'. You can also make your GAN a Conditional GAN by setting the keyword argument "c_dim" to a positive
-    integer, corresponding to the number of labels of your data.
+    This class allows the fitting of a Hierarchical Conditionally Conjugate Dirichlet Process Mixture Model with
+    cell-specific scalings.
+    The user has access to the trained parameters: component means, covariances, weights and cell-specific scalings.
 
-    References: https://arxiv.org/abs/1406.2661 - GAN
-                https://arxiv.org/abs/1611.04076 - LSGAN
-                https://arxiv.org/abs/1701.07875 - WGAN
-                https://arxiv.org/abs/1704.00028 - WGAN-GP
-
-    :param x_dim: dimensionality of the data (not needed if both generator and discriminator are passed)
-    :param generator: PyTorch module containing a neural network to act as the GAN's generator
-    :param discriminator: PyTorch module containing a neural network to act as the GAN's discriminator
-    :param flavour: loss function to use. May be 'x_entropy', 'least_squares', 'wasserstein', 'wasserstein-gp'
-    :param c_dim: number of labels associated with the data
-    :param z_dim: latent space dimensionality
-    :param h_dim: number of hidden units in the networks. Used only if generator and discriminator are not passed
-    :param use_cuda: whether to run everything on GPU or not
+    :param n_aux: number of auxiliary variables for the Chinese Restaurant Process
+    :param K_init: initial number of clusters
+    :param K: maximum number of clusters
     """
-    def __init__(self, x_dim=None, generator=None, discriminator=None, flavour='x_entropy', c_dim=0, z_dim=16, h_dim=100, use_cuda=True):
-        if generator is None:
-            assert x_dim is not None
-            generator = DefaultMLP(z_dim + c_dim, h_dim, x_dim, out_activation=nn.Sigmoid())
-        if discriminator is None:
-            assert x_dim is not None
-            if flavour == 'wasserstein':
-                discriminator = DefaultMLP(x_dim + c_dim, h_dim, z_dim)
-            else:
-                discriminator = DefaultMLP(x_dim + c_dim, h_dim, z_dim, out_activation=nn.Sigmoid())
-        self.generator = to_gpu(use_cuda, generator)
-        self.discriminator = to_gpu(use_cuda, discriminator)
-
-        self.flavour = flavour
-
-        self.z_dim = z_dim
-        self.c_dim = c_dim  # for conditional data generation
-        self.use_cuda = use_cuda
-
-        if flavour == 'wasserstein':
-            # WGAN uses RMS prop optimization with low learning rates
-            self.generator_optimizer = optim.RMSprop(self.generator.parameters(), lr=5e-4)
-            self.discriminator_optimizer = optim.RMSprop(self.discriminator.parameters(), lr=5e-4)
-        else:
-            self.generator_optimizer = optim.Adam(self.generator.parameters(), lr=1e-3)
-            self.discriminator_optimizer = optim.Adam(self.discriminator.parameters(), lr=1e-3)
-
-        # Sampler from the latent space probability distribution
-        self.z_sampler = lambda n: to_gpu(self.use_cuda, Variable(torch.randn(n, self.z_dim)))
-
-    def generate(self, num_samples=None, discrete_index=None, z_feed=None, to_numpy=True):
-        """
-        Sample the generator network. If no num_samples is passed, z_feed must be, and vice-versa. If the GAN is a CGAN,
-        discrete_index must be passed.
-
-        :param num_samples: number of samples to generate
-        :param discrete_index: the index of the label of the pattern to generate, in the case of a CGAN
-        :param z_feed: latent space sample
-        :param to_numpy: whether to return the data as a numpy array
-        :return: (num_samples x x_dim)-shaped numpy array or torch Variable, depending on "to_numpy" argument
-        """
-
-        if z_feed is None:
-            assert num_samples is not None
-            z_feed = self.sample_z(num_samples)
-        else:
-            z_feed = to_gpu(self.use_cuda, numpy_to_var(z_feed))
-
-        if self.c_dim != 0:  # check if is CGAN
-            assert discrete_index is not None
-            c = np.zeros([num_samples, self.c_dim])
-            c[range(num_samples), discrete_index] = 1
-            c = to_gpu(True, numpy_to_var(c))
-            generated = self.generator(z_feed, c)
-        else:
-            generated = self.generator(z_feed)
-
-        if to_numpy:
-            return var_to_numpy(generated)
-        return generated
-
-    def fit(self, patterns, labels=None, num_epochs=100, batch_size=50, d_rounds=1, clip_thres=0.01, lam=10, verbose=True):
-        """
-        Train the GAN.
-
-        :param patterns: the training data
-        :param labels: one-hot encoded labels array
-        :param num_epochs: number of epochs to run
-        :param batch_size: number of samples per batch
-        :param d_rounds: number of discriminator optimization steps per generator steps
-        :param clip_thres: weight-clipping threshold for flavour='wasserstein'
-        :param lam: weight of gradient penalization for flavour='wasserstein-gp'
-        :param verbose: whether to print out the losses at the end of each epoch
-        :return: numpy arrays with discriminator and generator losses over time
-        """
-
-        discriminator_loss_hist = np.zeros((num_epochs, 1))
-        generator_loss_hist = np.zeros((num_epochs, 1))
-
-        for epoch in range(num_epochs):
-            discriminator_loss, generator_loss = self.train_epoch(patterns, batch_size, labels=labels,
-                                                                  d_rounds=d_rounds, clip_thres=clip_thres, lam=lam)
-
-            discriminator_loss_hist[epoch] = var_to_numpy(discriminator_loss)
-            generator_loss_hist[epoch] = var_to_numpy(generator_loss)
-
-            if verbose:
-                print("Epoch %d, Discriminator loss %f, Generator loss %f" % (epoch, discriminator_loss_hist[epoch],
-                                                                              generator_loss_hist[epoch]))
-
-        return discriminator_loss_hist, generator_loss_hist
-
-    def generate_conditioned(self, num_samples, discrete_index, z_feed=None, to_numpy=True):
-        """
-        Generate data conditioned on the label given by discrete_index.
-
-        :param num_samples: number of conditioned samples to generate
-        :param discrete_index: index of the desired condition. must be < self.c_dim
-        :param z_feed: latent feed variable
-        :param to_numpy: whether to return the samples as a numpy array
-        :return: the generated conditioned samples
-        """
-
-        assert self.c_dim != 0
-
-        if z_feed is None:
-            z_feed = self.sample_z(num_samples)
-
-        c = np.zeros([num_samples, self.c_dim])
-        c[range(num_samples), discrete_index] = 1
-        c = to_gpu(True, numpy_to_var(c))
-
-        generated = self.generator(z_feed, c)
-        if to_numpy:
-            return var_to_numpy(generated)
-        return generated
-
-    def set_optimizers(self, generator_optimizer, discriminator_optimizer):
-        """
-        :param generator_optimizer: optimizer for G
-        :param discriminator_optimizer: optimizer for D
-        """
-
-        self.generator_optimizer = generator_optimizer
-        self.discriminator_optimizer = discriminator_optimizer
-
-    def get_optimizers(self):
-        return self.generator_optimizer, self.discriminator_optimizer
-
-    def reset_gradients(self):
-        """
-        Clean the gradients of both the generator and discriminator
-
-        :return: None
-        """
-
-        self.generator.zero_grad()
-        self.discriminator.zero_grad()
-
-    def set_z_sampler(self, func):
-        """
-        Set the sampler from the latent space probability distribution
-
-        :param func: a function with an argument defining the number of samples to return
-        """
-
-        self.z_sampler = func
-
-    def sample_z(self, num_samples, to_numpy=False):
-        """
-        Returns samples from the latent space distribution.
-
-        :param num_samples: number of samples to return
-        :param to_numpy: whether to return the samples as a numpy array
-        :return: (num_samples x self.z_dim)-shaped numpy array or torch Variable, depending on "to_numpy" argument
-        """
-
-        z = to_gpu(self.use_cuda, numpy_to_var(self.z_sampler(num_samples)))
-        if to_numpy:
-            return var_to_numpy(z)
-        return z
-
-    def train_epoch(self, samples, batch_size, labels=None, d_rounds=1, clip_thres=0.01, lam=10):
-        """
-        Train the models for one epoch (one full pass of the training set, updating the model's parameters batch_size
-        times)
-
-        :param samples: the real data. Can be either a torch Tensor or a numpy array of shape
-                        (num_samples x num_features)
-        :param batch_size: number of samples per batch
-        :param labels: labels, for if the GAN is a CGAN.
-        :param d_rounds: number of discriminator optimization steps per generator steps
-        :param clip_thres: weight-clipping threshold for flavour='wasserstein'
-        :param lam: weight of gradient penalization for flavour='wasserstein-gp'
-        :return: discriminator and generator losses as PyTorch Variables
-        :raises: ValueError if number of samples == batch_size
-        """
-
-        num_samples = samples.shape[0]
-        if num_samples == batch_size:
-            print("Error: samples.shape[0] can't be equal to batch_size.")
-            raise ValueError
-
-        samples = to_gpu(self.use_cuda, numpy_to_var(samples))
-        if labels is not None:
-            labels = to_gpu(self.use_cuda, numpy_to_var(labels))
-
-        discriminator_loss = 0
-        generator_loss = 0
-        labels_batch = None
-
-        for batch_idx in range(0, int(num_samples / batch_size) - d_rounds, d_rounds):
-            for d_iter in range(d_rounds):
-                patterns_batch = get_batch(samples, batch_size, batch_idx + d_iter, labels)
-                labels_batch = None
-                if labels is not None:
-                    labels_batch = patterns_batch[1]
-                patterns_batch = patterns_batch[0]
-                discriminator_loss = self.train_d(patterns_batch, batch_size, labels_batch=labels_batch, clip_thres=clip_thres, lam=lam)
-
-            generator_loss = self.train_g(batch_size, labels_batch=labels_batch)
-
-        return discriminator_loss, generator_loss
-
-    def train_d(self, patterns_batch, batch_size, labels_batch=None, clip_thres=0.01, lam=10):
-        """
-        Update the discriminator's parameters.
-
-        :param patterns_batch: a batch of patterns
-        :param batch_size: number of samples per batch
-        :param labels_batch: a batch of labels, for if the GAN is a CGAN.
-        :param clip_thres: weight-clipping threshold for flavour='wasserstein'
-        :param lam: weight of gradient penalization for flavour='wasserstein-gp'
-        :return: discriminator loss as a PyTorch Variable
-        """
-
-        self.reset_gradients()
-        self.generator.eval()
-
-        if self.flavour == 'wasserstein-gp':
-            return self.train_d_gp(patterns_batch, batch_size, labels_batch, lam)
-
-        if labels_batch is not None:
-            discriminator_loss = self.train_d_conditioned(patterns_batch, labels_batch, batch_size, clip_thres)
-        else:
-            fake_sample = self.generator(self.sample_z(batch_size))
-
-            discriminator_real = self.discriminator(patterns_batch)
-            discriminator_fake = self.discriminator(fake_sample)
-
-            discriminator_loss = d_loss(self.flavour, discriminator_real, discriminator_fake)
-
-            discriminator_loss.backward()
-            self.discriminator_optimizer.step()
-
-            if self.flavour == 'wasserstein':
-                for p in self.discriminator.parameters():
-                    p.data.clamp_(-clip_thres, clip_thres)
-
-        return discriminator_loss
-
-    def train_d_conditioned(self, patterns_batch, labels_batch, batch_size, clip_thres=0.01):
-        """
-        Updating scheme for the discriminator's parameters in the case of a CGAN.
-
-        :param patterns_batch: a batch of patterns
-        :param batch_size: number of samples per batch
-        :param labels_batch: a batch of labels, for if the GAN is a CGAN.
-        :param clip_thres: weight-clipping threshold for flavour='wasserstein'
-        :return: discriminator loss as a PyTorch Variable
-        """
-
-        assert labels_batch.size(1) == self.c_dim
-
-        fake_sample = self.generator(self.sample_z(batch_size), labels_batch)
-
-        discriminator_real = self.discriminator(patterns_batch, labels_batch)
-        discriminator_fake = self.discriminator(fake_sample, labels_batch)
-
-        discriminator_loss = d_loss(self.flavour, discriminator_real, discriminator_fake)
-
-        discriminator_loss.backward()
-        self.discriminator_optimizer.step()
-
-        if self.flavour == 'wasserstein':
-            for p in self.discriminator.parameters():
-                p.data.clamp_(-clip_thres, clip_thres)
-
-        return discriminator_loss
-
-    def train_d_gp(self, patterns_batch, batch_size, labels_batch=None, lam=10):
-        """
-        Updating scheme for the discriminator's parameters in the case of self.flavour='wasserstein-gp'.
-
-        :param patterns_batch: a batch of patterns
-        :param batch_size: number of samples per batch
-        :param labels_batch: a batch of labels, for if the GAN is a CGAN.
-        :param lam: weight of gradient penalization
-        :return: discriminator loss as a PyTorch Variable
-        """
-
-        self.reset_gradients()
-        self.generator.eval()
-
-        if labels_batch is not None:
-            discriminator_loss = self.train_d_gp_conditioned(patterns_batch, labels_batch, batch_size, lam)
-        else:
-            eps_batch = to_gpu(self.use_cuda, Variable(torch.rand(batch_size, 1)))
-            eps_batch = eps_batch.expand(patterns_batch.size())
-
-            fake_batch = self.generator(self.sample_z(batch_size))
-            x_hat = eps_batch * patterns_batch + (1 - eps_batch) * fake_batch
-
-            discriminator_hat = self.discriminator(x_hat)
-
-            gradients = autograd.grad(outputs=discriminator_hat, inputs=x_hat,
-                                      grad_outputs=to_gpu(self.use_cuda, torch.ones(discriminator_hat.size())),
-                                      create_graph=True, retain_graph=True, only_inputs=True)[0]
-
-            gradient_penalty = torch.mean(((gradients.norm(2, dim=1) - 1) ** 2)) * lam
-
-            discriminator_fake = self.discriminator(fake_batch)
-            discriminator_real = self.discriminator(patterns_batch)
-
-            discriminator_loss = torch.mean(discriminator_fake) - torch.mean(discriminator_real) + gradient_penalty
-            # discriminator_loss = d_loss(self.flavour, discriminator_real, discriminator_fake) + gradient_penalty
-
-            discriminator_loss.backward()
-            self.discriminator_optimizer.step()
-
-        return discriminator_loss
-
-    def train_d_gp_conditioned(self, patterns_batch, labels_batch, batch_size, lam=10):
-        """
-        Updating scheme for the discriminator's parameters in the case of self.flavour='wasserstein-gp' and CGAN
-
-        :param patterns_batch: a batch of patterns
-        :param batch_size: number of samples per batch
-        :param labels_batch: a batch of labels, for if the GAN is a CGAN.
-        :param lam: weight of gradient penalization
-        :return: discriminator loss as a PyTorch Variable
-        """
-
-        assert labels_batch.size(1) == self.c_dim
-
-        eps_batch = to_gpu(self.use_cuda, Variable(torch.rand(batch_size, 1)))
-        eps_batch = eps_batch.expand(patterns_batch.size())
-
-        fake_batch = self.generator(self.sample_z(batch_size), labels_batch)
-        x_hat = eps_batch * patterns_batch + (1 - eps_batch) * fake_batch
-
-        discriminator_hat = self.discriminator(x_hat, labels_batch)
-
-        gradients = autograd.grad(outputs=discriminator_hat, inputs=x_hat,
-                                  grad_outputs=to_gpu(self.use_cuda, torch.ones(discriminator_hat.size())),
-                                  create_graph=True, retain_graph=True, only_inputs=True)[0]
-
-        gradient_penalty = torch.mean(((gradients.norm(2, dim=1) - 1) ** 2)) * lam
-
-        discriminator_fake = self.discriminator(fake_batch, labels_batch)
-        discriminator_real = self.discriminator(patterns_batch, labels_batch)
-
-        discriminator_loss = d_loss(self.flavour, discriminator_real, discriminator_fake) + gradient_penalty
-
-        discriminator_loss.backward()
-        self.discriminator_optimizer.step()
-
-        return discriminator_loss
-
-    def train_g(self, batch_size, labels_batch=None):
-        """
-        Update the generator's parameters.
-
-        :param batch_size: number of samples per batch
-        :param labels_batch: a batch of labels, for if the GAN is a CGAN.
-        :return: generator loss as a PyTorch Variable
-        """
-
-        self.reset_gradients()
-        self.generator.eval()
-
-        if labels_batch is not None:
-            generator_loss = self.train_g_conditioned(batch_size, labels_batch)
-        else:
-            fake_sample = self.generator(self.sample_z(batch_size))
-
-            discriminator_fake = self.discriminator(fake_sample)
-
-            generator_loss = g_loss(self.flavour, discriminator_fake)
-
-            generator_loss.backward()
-            self.generator_optimizer.step()
-
-        return generator_loss
-
-    def train_g_conditioned(self, batch_size, labels_batch):
-        """
-        Update the generator's parameters for when the GAN is a CGAN
-
-        :param batch_size: number of samples per batch
-        :param labels_batch: a batch of labels
-        :return: generator loss as a PyTorch Variable
-        """
-
-        assert labels_batch.size(1) == self.c_dim
-
-        fake_sample = self.generator(self.sample_z(batch_size), labels_batch)
-
-        discriminator_fake = self.discriminator(fake_sample, labels_batch)
-
-        generator_loss = g_loss(self.flavour, discriminator_fake)
-
-        generator_loss.backward()
-        self.generator_optimizer.step()
-
-        return generator_loss
+    def __init__(self, n_aux=1, K=20, K_init=1,):
+        self.n_aux = n_aux
+        self.K = K
+
+        self.K_active = K_init
+
+        # Model parameters
+        self.pi = 1
+        self.mu = 1
+        self.cov = 1
+        self.cov_inv = 1
+
+        # Assignments
+        self.z = 1
+
+        # Identifiability constraints
+        self.min_phi = 1
+        self.max_phi = 1
+        self.min_beta = 1
+        self.max_beta = 1
+
+    # Prior distributions
+    def sample_prior_hyperparameters(self, X_mean, X_cov, d):
+        mulinha = multivariate_normal.rvs(mean=X_mean, cov=X_cov)
+        Sigmalinha = invwishart.rvs(df=d, scale=d * X_cov)
+        Hlinha = wishart.rvs(df=d, scale=X_cov / d)
+        sigmalinha = invgamma.rvs(1, 1 / d) + d
+        return mulinha, Sigmalinha, Hlinha, sigmalinha
+
+    def sample_prior_mixture_components(self, mulinha, Sigmalinha, Hlinha, sigmalinha, d, nsamples=1):
+        mu = multivariate_normal.rvs(mean=mulinha, cov=Sigmalinha, size=nsamples).reshape(nsamples, d)
+        cov_inv = wishart.rvs(df=sigmalinha, scale=np.linalg.inv(Hlinha), size=nsamples).reshape(nsamples, d, d)
+        cov = np.linalg.inv(self.cov_inv)
+        return mu, cov_inv, cov
+
+    def sample_prior_alpha(self):
+        return invgamma.rvs(1, 1)
+
+    def sample_prior_pi(self, alpha):
+        self.pi = dirichlet.rvs(alpha / self.K_active * np.ones((self.K_active,))).T
+
+    def sample_prior_cell_scalings(self, ups, delta_sq, omega, theta, N):
+        phi = norm.rvs(ups, delta_sq, size=N)
+        beta = invgamma.rvs(omega, theta, size=N)
+        return phi, beta
+
+    # Posterior distributions
+    def update_mixture_components(self, X, mulinha, Sigmalinha, Hlinha, sigmalinha, nk, active_components,
+                                  phi, beta):
+        K = self.K_active
+
+        Sigmalinha_inv = np.linalg.inv(Sigmalinha)
+        for k in range(K):
+            k_inds = np.argwhere(self.z == active_components[k]).ravel()
+            X_k = X[k_inds]  # all the points in current cluster k
+            phi_k = phi[k_inds]
+            phi_k = phi_k.reshape(len(phi_k), -1)
+            beta_k = beta[k_inds]
+            beta_k = beta_k.reshape(len(beta_k), -1)
+
+            covariance_inv = Sigmalinha_inv + self.cov_inv[k].dot(np.sum(phi_k ** 2 / beta_k))
+            covariance = np.linalg.inv(covariance_inv)
+            mean = covariance.dot(Sigmalinha_inv.dot(mulinha) + self.cov_inv[k].dot(np.sum(X_k / beta_k, axis=0)))
+            self.mu[k] = multivariate_normal.rvs(mean=mean, cov=covariance)
+
+            aux = np.dot((X_k - phi_k * self.mu[k]).T, (X_k - phi_k * self.mu[k]) / beta_k)
+            self.cov_inv[k] = wishart.rvs(df=int(np.ceil(sigmalinha)) + nk[k] + 1, scale=np.linalg.inv(Hlinha + aux))
+            self.cov[k] = np.linalg.inv(self.cov_inv[k])
+
+    def update_hyperparameters(self, X_mean, X_cov_inv, d, mulinha, Sigmalinha, Hlinha, sigmalinha):
+        K = self.K_active
+
+        # mulinha
+        Sigmalinha_inv = np.linalg.inv(Sigmalinha)
+        covariance = np.linalg.inv(X_cov_inv + K * Sigmalinha_inv)
+        mean = covariance.dot(K ** 2 * Sigmalinha_inv.dot(np.mean(self.mu, axis=0)) + X_cov_inv.dot(X_mean))
+        mulinha = multivariate_normal.rvs(mean=mean, cov=covariance)
+
+        # Sigmalinha
+        aux = np.matmul((self.mu - mulinha).T, self.mu - mulinha)
+        Sigmalinha = np.linalg.inv(wishart.rvs(df=d + K, scale=np.linalg.inv(d * X_cov_inv + 2 * aux)))
+
+        # Hlinha
+        Hlinha = invwishart.rvs(df=d + K * sigmalinha, scale=d * X_cov_inv + np.sum(self.cov_inv, axis=0))
+
+        # sigmalinha
+        sigmalinha = invgamma.rvs(1, 1 / d)
+
+        return mulinha, Sigmalinha, Hlinha, sigmalinha
+
+    def cluster_probs_at_point(self, x):
+        probs = [(self.pi[k] * multivariate_normal.pdf(x, mean=self.mu[k], cov=self.cov_inv[k])) for k in
+                 range(self.K_active)]
+        probs = probs / np.sum(probs)
+        return probs
+
+    def prior_update_z(self, X, N):
+        for n in range(N):
+            probs = np.array(self.cluster_probs_at_point(X[n])).ravel()
+            self.z[n] = np.random.choice(range(self.K_active), p=probs)
+
+    def update_z_inf(self, X, X_mean, X_cov, d, N, nk, alpha, phi, beta, active_components):
+        mulinha_, Sigmalinha_, Hlinha_, sigmalinha_ = self.sample_prior_hyperparameters(X_mean, X_cov, d)
+        for n in range(N):
+            if nk[np.argwhere(active_components == self.z[n])] == 1:
+                self.z[n] = np.random.choice(range(self.K_active, self.K_active + self.n_aux))
+                continue
+
+            means, covariance_invs, covariances = self.sample_prior_mixture_components(mulinha_, Sigmalinha_, Hlinha_,
+                                                                          sigmalinha_, d, nsamples=self.n_aux)
+            # avoid singular matrices!
+            if np.linalg.cond(beta[n] * covariances[0]) < 1 / sys.float_info.epsilon:
+                means, covariance_invs, covariances = self.sample_prior_mixture_components(mulinha_, Sigmalinha_, Hlinha_,
+                                                                              sigmalinha_, d, nsamples=self.n_aux)
+
+            probs = np.ones((self.K_active + self.n_aux,))
+
+            for k_active in range(self.K_active):
+                probs[k_active] = \
+                    (nk[k_active] - 1) / (N - 1 + alpha) * multivariate_normal.pdf(X[n],
+                                                                                   mean=phi[n] * self.mu[k_active],
+                                                                                   cov=beta[n] * self.cov[k_active])
+
+            for k_aux in range(self.n_aux):
+                probs[self.K_active + k_aux] = \
+                    (alpha / self.n_aux) / (N - 1 + alpha) * multivariate_normal.pdf(X[n], mean=phi[n] * means[k_aux],
+                                                                                     cov=beta[n] * covariances[k_aux])
+
+            probs = probs / np.sum(probs)
+
+            self.z[n] = np.random.choice(range(self.K_active + self.n_aux), p=probs)
+
+    def update_counts(self):
+        nk = np.ones((self.K,))
+        for k in range(self.K):
+            nk[k] = np.count_nonzero(self.z == k)
+        return nk
+
+    def update_pi(self, alpha, nk):
+        self.pi =  dirichlet.rvs(alpha / len(nk) * np.ones((len(nk),)) + nk).T
+
+    def get_active_components(self, nk):
+        active_clusters = []
+        for k in range(self.K):
+            if nk[k] > 0:
+                active_clusters.append(k)
+
+        self.K_active = len(active_clusters)
+        return active_clusters
+
+    def add_new_components(self, active, d):
+        if np.any(np.array(active) > self.mu.shape[0] - 1):  # need to grow the vectors!
+            new_max = max(active) + 1
+            mu_new = np.zeros((new_max, d))
+            mu_new[:-1, :] = self.mu
+            cov_inv_new = np.zeros((new_max, d, d))
+            cov_inv_new[:-1, :, :] = self.cov_inv
+            pi_new = np.zeros((new_max, 1))
+            pi_new[:-1] = self.pi
+            self.mu = mu_new
+            self.cov_inv = cov_inv_new
+            self.pi = pi_new
+
+    def remove_empty_components(self, active, nk):
+        new_nk = nk[active]
+        self.mu = self.mu[active]
+        self.cov_inv = self.cov_inv[active]
+        new_pi = self.pi[active]
+        self.pi = new_pi / np.sum(new_pi)
+        return new_nk
+
+    def update_alpha(self):
+        return invgamma.rvs(1, 1)
+
+    def update_pi(self, alpha, nk):
+        return dirichlet.rvs(alpha / len(nk) * np.ones((len(nk),)) + nk).T
+
+    def update_cell_scalings(self, X, N, d, phi, beta, ups, delta_sq, omega, theta, active):
+        for n in range(N):
+            k = np.argwhere(active == self.z[n])[0][0]
+
+            # Update phi
+            A = 1. / np.sqrt(beta[n] * np.abs(self.cov_inv[k]))
+            A_mu_k = A.dot(self.mu[k])
+            delta_xsq = 1. / np.sum(A_mu_k)
+
+            A_x_j = A.dot(X[n])
+            ups_x = delta_xsq * np.sum(A_x_j.dot(A_mu_k))
+
+            delta_psq = np.abs(1. / ((1. / delta_xsq) + 1. / (delta_sq)))
+            ups_p = np.abs(delta_psq * (ups_x / delta_xsq + ups / delta_sq))
+            phi[n] = norm.rvs(ups_p, delta_psq)
+
+            # identifiability constraint on phi
+            if phi[n] < self.min_phi:
+                phi[n] = self.min_phi + norm.rvs(0, 0.1)
+            elif phi[n] > self.max_phi:
+                phi[n] = self.max_phi - norm.rvs(0, 0.1)
+
+            # Update beta
+            omega_p = omega + d / 2.
+            theta_p = np.abs(theta + 0.5 * np.dot(X[n] - phi[n] * self.mu[k],
+                                                  self.cov_inv[k]).dot(X[n] - phi[n] * self.mu[k]))
+
+            beta[n] = invgamma.rvs(omega_p, theta_p)
+
+            # identifiability constraint on beta
+            if beta[n] < self.min_beta:
+                beta[n] = self.min_beta + invgamma.rvs(omega_p, 1. / omega_p)
+            elif beta[n] > self.max_beta:
+                beta[n] = np.abs(self.max_beta - invgamma.rvs(omega_p, 1. / omega_p))
+
+        return phi, beta
+
+    def fit(self, X, n_iterations=100, phi_hyperparams=[0, 1], beta_hyperparams=[1, 1], verbose=False):
+        N = X.shape[0]  # number of samples
+        d = X.shape[1]  # data dimensionality
+
+        # Model parameters
+        self.pi = np.zeros((self.K,))
+        self.mu = np.zeros((self.K, d))
+        self.cov = np.zeros((self.K, d, d))
+        self.cov_inv = np.zeros((self.K, d, d))
+
+        # Assignments
+        self.z = np.zeros((N, ))
+
+        # Cell-specific moment scaling parameters
+        phi = np.zeros((N, ))
+        beta = np.zeros((N, ))
+
+        X_mean = np.mean(X, axis=0)
+        X_cov = np.cov(X.T)
+        X_cov_inv = np.linalg.inv(X_cov)
+
+        ups = phi_hyperparams[0]
+        delta_sq = phi_hyperparams[1]
+        omega = beta_hyperparams[0]
+        theta = beta_hyperparams[1]
+
+        mulinha, Sigmalinha, Hlinha, sigmalinha = self.sample_prior_hyperparameters(X_mean, X_cov, d)
+        self.mu, self.cov_inv, self.cov = self.sample_prior_mixture_components(mulinha, Sigmalinha, Hlinha, sigmalinha, d, nsamples=self.K_active)
+        alpha = self.sample_prior_alpha()
+        self.sample_prior_pi(alpha)
+        self.prior_update_z(X, N)
+        nk = self.update_counts()
+        active_components = self.get_active_components(nk)
+        nk = self.remove_empty_components(active_components, nk)
+        # The parameter vectors are now of length self.K_active
+        phi, beta = self.sample_prior_cell_scalings(ups, delta_sq, omega, theta, N)
+
+        for i in range(0, n_iterations):
+            # Sampling from the conditional posteriors
+            alpha = self.update_alpha()
+            self.update_pi(alpha, nk)
+
+            self.update_mixture_components(X, mulinha, Sigmalinha, Hlinha, sigmalinha, nk,
+                                           active_components, phi, beta)
+
+            phi, beta = self.update_cell_scalings(X, N, d, phi, beta, ups, delta_sq, omega, theta, active_components)
+
+            # the hyperparameters are the same for all mixture components
+            mulinha, Sigmalinha, Hlinha, sigmalinha = self.update_hyperparameters(X_mean, X_cov_inv, d,
+                                                                            mulinha, Sigmalinha, Hlinha, sigmalinha)
+
+            self.update_z_inf(X, X_mean, X_cov, d, N, nk, alpha, phi, beta, active_components)
+            nk = self.update_counts()
+            active_components = self.get_active_components(nk)
+            self.add_new_components(active_components, d)
+            nk = self.remove_empty_components(active_components, nk)  # The parameter vectors are now of length K_active
+
+            print(i)
