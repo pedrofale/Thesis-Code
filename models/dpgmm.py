@@ -28,13 +28,13 @@ class DPGMM(object):
         self.K_active = K_init
 
         # Model parameters
-        self.pi = 1
-        self.mu = 1
-        self.cov = 1
-        self.cov_inv = 1
+        self.pi = np.ones((1, ))
+        self.mu = np.ones((1, 1))
+        self.cov = np.ones((1, 1, 1))
+        self.cov_inv = np.ones((1, 1, 1))
 
         # Assignments
-        self.z = 1
+        self.z = np.ones((1, ))
 
     def log_likelihood(self, X):
         """
@@ -244,3 +244,38 @@ class DPGMM(object):
 
             if print_log_likelihood:
                 print(self.log_likelihood(X))
+
+    def sample(self, n_samples=1):
+        d = self.mu.shape[1]
+
+        z = np.ones((n_samples,))
+        X = np.zeros((n_samples, d))
+
+        for n in range(n_samples):
+            # select one of the clusters
+            k = np.random.choice(range(self.K_active), p=self.pi.ravel())
+            z[n] = k
+
+            # sample an observation
+            X[n] = multivariate_normal.rvs(mean=self.mu[k], cov=self.cov[k])
+
+        return X, z
+
+    def set_random_parameters(self, X, K):
+        X_mean = np.mean(X, axis=0)
+        X_cov = np.cov(X.T)
+        d = X.shape[1]
+
+        # Hyperparameters
+        mulinha = multivariate_normal.rvs(mean=X_mean, cov=X_cov)
+        Sigmalinha = invwishart.rvs(df=d, scale=d * X_cov)
+        Hlinha = wishart.rvs(df=d, scale=X_cov / d)
+        sigmalinha = invgamma.rvs(1, 1 / d) + d
+
+        # Parameters
+        self.mu = multivariate_normal.rvs(mean=mulinha, cov=Sigmalinha, size=K).reshape(K, d)
+        self.cov_inv = wishart.rvs(df=sigmalinha, scale=np.linalg.inv(Hlinha), size=K).reshape(K, d, d)
+        self.cov = np.linalg.inv(self.cov_inv)
+
+        alpha = invgamma.rvs(1, 1)
+        self.pi = dirichlet.rvs(alpha / self.K_active * np.ones((self.K_active,))).T
