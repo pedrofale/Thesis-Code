@@ -182,8 +182,7 @@ class Biscuit(DPGMM):
             self.add_new_components(active_components, d)
             nk = self.remove_empty_components(active_components, nk)  # The parameter vectors are now of length K_active
 
-    def sample(self, **kwargs):
-        n_samples = kwargs['n_samples']
+    def sample(self, n_samples=1):
         ups = 0
         delta_sq = 2
         omega = 1
