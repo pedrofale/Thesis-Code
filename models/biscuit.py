@@ -19,12 +19,9 @@ class Biscuit(DPGMM):
     cell-specific scalings.
     The user has access to the trained parameters: component means, covariances, weights and cell-specific scalings.
 
-    :param n_aux: number of auxiliary variables for the Chinese Restaurant Process
-    :param K_init: initial number of clusters
-    :param K: maximum number of clusters
     """
-    def __init__(self, n_aux=1, K=20, K_init=1,):
-        DPGMM.__init__(self, n_aux=n_aux, K=K, K_init=K_init)
+    def __init__(self, **kwargs):
+        DPGMM.__init__(self, **kwargs)
 
         # Cell-specific scaling parameters
         self.phi = 1
