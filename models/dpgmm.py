@@ -36,7 +36,6 @@ class DPGMM(object):
         # Assignments
         self.z = 1
 
-    # Log likelihood
     def log_likelihood(self, X):
         """
         Data log-likelihood
@@ -56,13 +55,15 @@ class DPGMM(object):
         mulinha = multivariate_normal.rvs(mean=X_mean, cov=X_cov)
         Sigmalinha = invwishart.rvs(df=d, scale=d * X_cov)
         Hlinha = wishart.rvs(df=d, scale=X_cov / d)
+        while np.all(np.linalg.eigvals(Hlinha) > 0) is False:
+            Hlinha = wishart.rvs(df=d, scale=X_cov / d)
         sigmalinha = invgamma.rvs(1, 1 / d) + d
         return mulinha, Sigmalinha, Hlinha, sigmalinha
 
     def sample_prior_mixture_components(self, mulinha, Sigmalinha, Hlinha, sigmalinha, d, nsamples=1):
         mu = multivariate_normal.rvs(mean=mulinha, cov=Sigmalinha, size=nsamples).reshape(nsamples, d)
-        cov_inv = wishart.rvs(df=sigmalinha, scale=np.linalg.inv(Hlinha), size=nsamples).reshape(nsamples, d, d)
-        cov = np.linalg.inv(cov_inv)
+        cov = wishart.rvs(df=sigmalinha, scale=Hlinha, size=nsamples).reshape(nsamples, d, d)
+        cov_inv = np.linalg.inv(cov)
         return mu, cov_inv, cov
 
     def sample_prior_alpha(self):
@@ -130,7 +131,7 @@ class DPGMM(object):
             means, covariance_invs, covariances = self.sample_prior_mixture_components(mulinha_, Sigmalinha_, Hlinha_,
                                                                           sigmalinha_, d, nsamples=self.n_aux)
             # avoid singular matrices!
-            while np.linalg.cond(covariances[0]) < 1 / sys.float_info.epsilon:
+            if np.linalg.cond(covariances[0]) < 1 / sys.float_info.epsilon:
                 means, covariance_invs, covariances = self.sample_prior_mixture_components(mulinha_, Sigmalinha_, Hlinha_,
                                                                               sigmalinha_, d, nsamples=self.n_aux)
 
