@@ -1,3 +1,4 @@
 .idea/
 figures/
-
+models/__pycache/
+models/*.pyc
