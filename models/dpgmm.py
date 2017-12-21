@@ -130,7 +130,7 @@ class DPGMM(object):
             means, covariance_invs, covariances = self.sample_prior_mixture_components(mulinha_, Sigmalinha_, Hlinha_,
                                                                           sigmalinha_, d, nsamples=self.n_aux)
             # avoid singular matrices!
-            if np.linalg.cond(covariances[0]) < 1 / sys.float_info.epsilon:
+            while np.linalg.cond(covariances[0]) < 1 / sys.float_info.epsilon:
                 means, covariance_invs, covariances = self.sample_prior_mixture_components(mulinha_, Sigmalinha_, Hlinha_,
                                                                               sigmalinha_, d, nsamples=self.n_aux)
 
