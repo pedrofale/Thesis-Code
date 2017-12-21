@@ -181,3 +181,31 @@ class Biscuit(DPGMM):
             active_components = self.get_active_components(nk)
             self.add_new_components(active_components, d)
             nk = self.remove_empty_components(active_components, nk)  # The parameter vectors are now of length K_active
+
+    def sample(self, **kwargs):
+        n_samples = kwargs['n_samples']
+        ups = 0
+        delta_sq = 2
+        omega = 1
+        theta = 1
+
+        d = self.mu.shape[1]
+
+        z = np.ones((n_samples,))
+        phi = np.ones((n_samples,))
+        beta = np.ones((n_samples,))
+        X = np.zeros((n_samples, d))
+
+        for n in range(n_samples):
+            # select one of the clusters
+            k = np.random.choice(range(self.K_active), p=self.pi.ravel())
+            z[n] = k
+
+            # sample scaling parameters
+            phi[n] = norm.rvs(ups, delta_sq)
+            beta[n] = invgamma.rvs(omega, theta)
+
+            # sample an observation
+            X[n] = multivariate_normal.rvs(mean=phi[n] * self.mu[k], cov=beta[n] * self.cov[k])
+
+        return X, z
