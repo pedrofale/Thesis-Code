@@ -273,6 +273,7 @@ class DPGMM(object):
         sigmalinha = invgamma.rvs(1, 1 / d) + d
 
         # Parameters
+        self.K_active = K
         self.mu = multivariate_normal.rvs(mean=mulinha, cov=Sigmalinha, size=K).reshape(K, d)
         self.cov_inv = wishart.rvs(df=sigmalinha, scale=np.linalg.inv(Hlinha), size=K).reshape(K, d, d)
         self.cov = np.linalg.inv(self.cov_inv)
