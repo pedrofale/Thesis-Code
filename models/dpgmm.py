@@ -15,7 +15,7 @@ class DPGMM(object):
     """
     This class allows the fitting of a Hierarchical Conditionally Conjugate Dirichlet Process Mixture Model with
     cell-specific scalings.
-    The user has access to the trained parameters: component means, covariances, weights and cell-specific scalings.
+    The user has access to the trained parameters: component means, covariances and weights.
 
     :param n_aux: number of auxiliary variables for the Chinese Restaurant Process
     :param K_init: initial number of clusters
