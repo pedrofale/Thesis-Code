@@ -125,7 +125,9 @@ class Biscuit(DPGMM):
             elif self.beta[n] > self.max_beta:
                 self.beta[n] = np.abs(self.max_beta - invgamma.rvs(omega_p, 1. / omega_p))
 
-    def fit(self, X, n_iterations=100, phi_hyperparams=[0, 1], beta_hyperparams=[1, 1], verbose=False):
+    def fit(self, X, n_iterations=100, n_burnin=50, phi_hyperparams=[0, 1], beta_hyperparams=[1, 1],
+            compute_cm=False, print_log_likelihood=False, verbose=False):
+
         N = X.shape[0]  # number of samples
         d = X.shape[1]  # data dimensionality
 
@@ -162,7 +164,7 @@ class Biscuit(DPGMM):
         # The parameter vectors are now of length self.K_active
         self.sample_prior_cell_scalings(ups, delta_sq, omega, theta, N)
 
-        for _ in tqdm(range(0, n_iterations)):
+        for i in tqdm(range(0, n_iterations)):
             # Sampling from the conditional posteriors
             alpha = self.update_alpha()
             self.update_pi(alpha, nk)
@@ -181,6 +183,12 @@ class Biscuit(DPGMM):
             active_components = self.get_active_components(nk)
             self.add_new_components(active_components, d)
             nk = self.remove_empty_components(active_components, nk)  # The parameter vectors are now of length K_active
+
+            if compute_cm and i > n_burnin:
+                self.update_confusion_matrix()
+
+            if print_log_likelihood:
+                print(self.log_likelihood(X))
 
     def sample(self, n_samples=1):
         ups = 0
