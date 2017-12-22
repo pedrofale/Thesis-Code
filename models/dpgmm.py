@@ -254,7 +254,14 @@ class DPGMM(object):
             if print_log_likelihood:
                 print(self.log_likelihood(X))
 
-    def sample(self, n_samples=1):
+    def sample(self, n_samples=1, sort=False):
+        """
+        Sample points from the defined GMM and allow the samples generated to be sorted according to the cluster
+        they belong to.
+
+        :param n_samples: number of samples to generate
+        :return: X, z: samples and their assignments
+        """
         d = self.mu.shape[1]
 
         z = np.ones((n_samples,))
@@ -267,6 +274,10 @@ class DPGMM(object):
 
             # sample an observation
             X[n] = multivariate_normal.rvs(mean=self.mu[k], cov=self.cov[k])
+
+        if sort:
+            ind = np.argsort(z)
+            X = X[ind]
 
         return X, z
 
