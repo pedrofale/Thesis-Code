@@ -204,7 +204,7 @@ class Biscuit(DPGMM):
 
         d = self.mu.shape[1]
 
-        z = np.ones((n_samples,))
+        self.z = np.ones((n_samples,))
         phi = np.ones((n_samples,))
         beta = np.ones((n_samples,))
         X = np.zeros((n_samples, d))
@@ -212,7 +212,7 @@ class Biscuit(DPGMM):
         for n in range(n_samples):
             # select one of the clusters
             k = np.random.choice(range(self.K_active), p=self.pi.ravel())
-            z[n] = k
+            self.z[n] = k
 
             # sample scaling parameters
             phi[n] = norm.rvs(ups, delta_sq)
@@ -222,8 +222,8 @@ class Biscuit(DPGMM):
             X[n] = multivariate_normal.rvs(mean=phi[n] * self.mu[k], cov=beta[n] * self.cov[k])
 
         if sort:
-            ind = np.argsort(z)
-            z = z[ind]
+            ind = np.argsort(self.z)
+            self.z = self.z[ind]
             X = X[ind]
 
-        return X, z
+        return X
