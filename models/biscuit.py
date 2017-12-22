@@ -7,7 +7,6 @@ http://proceedings.mlr.press/v48/prabhakaran16.html
 
 from models.dpgmm import DPGMM
 
-import sys
 import numpy as np
 from scipy.stats import multivariate_normal, wishart, invgamma, norm
 from tqdm import tqdm

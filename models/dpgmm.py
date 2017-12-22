@@ -5,10 +5,11 @@ http://mlg.eng.cam.ac.uk/pub/pdf/GoeRas10.pdf
 
 # Author: Pedro Ferreira
 
-import sys
 import numpy as np
 from scipy.stats import multivariate_normal, wishart, invgamma, invwishart, dirichlet
 from tqdm import tqdm as tqdm
+
+from utils.scipy_utils import matrix_is_well_conditioned
 
 
 class DPGMM(object):
@@ -54,8 +55,10 @@ class DPGMM(object):
     def sample_prior_hyperparameters(self, X_mean, X_cov, d):
         mulinha = multivariate_normal.rvs(mean=X_mean, cov=X_cov)
         Sigmalinha = invwishart.rvs(df=d, scale=d * X_cov)
+        while matrix_is_well_conditioned(Sigmalinha) is not True:
+            Sigmalinha = invwishart.rvs(df=d, scale=d * X_cov)
         Hlinha = wishart.rvs(df=d, scale=X_cov / d)
-        while np.all(np.linalg.eigvals(Hlinha) > 0) is False:
+        while matrix_is_well_conditioned(Hlinha) is not True:
             Hlinha = wishart.rvs(df=d, scale=X_cov / d)
         sigmalinha = invgamma.rvs(1, 1 / d) + d
         return mulinha, Sigmalinha, Hlinha, sigmalinha
@@ -63,8 +66,9 @@ class DPGMM(object):
     def sample_prior_mixture_components(self, mulinha, Sigmalinha, Hlinha, sigmalinha, d, nsamples=1):
         mu = multivariate_normal.rvs(mean=mulinha, cov=Sigmalinha, size=nsamples).reshape(nsamples, d)
         cov = wishart.rvs(df=sigmalinha, scale=Hlinha, size=nsamples).reshape(nsamples, d, d)
-        while np.all(np.linalg.eigvals(cov) > 0) is False:
-            cov = wishart.rvs(df=sigmalinha, scale=Hlinha, size=nsamples).reshape(nsamples, d, d)
+        for i in range(nsamples):
+            while matrix_is_well_conditioned(cov[i]) is not True:
+                cov = wishart.rvs(df=sigmalinha, scale=Hlinha, size=nsamples).reshape(nsamples, d, d)
         cov_inv = np.linalg.inv(cov)
         return mu, cov_inv, cov
 
@@ -132,11 +136,6 @@ class DPGMM(object):
 
             means, covariance_invs, covariances = self.sample_prior_mixture_components(mulinha_, Sigmalinha_, Hlinha_,
                                                                           sigmalinha_, d, nsamples=self.n_aux)
-            # avoid singular matrices!
-            while np.all(np.linalg.eigvals(covariances[0]) > 0) is False:
-                mulinha_, Sigmalinha_, Hlinha_, sigmalinha_ = self.sample_prior_hyperparameters(X_mean, X_cov, d)
-                means, covariance_invs, covariances = self.sample_prior_mixture_components(mulinha_, Sigmalinha_, Hlinha_,
-                                                                              sigmalinha_, d, nsamples=self.n_aux)
 
             probs = np.ones((self.K_active + self.n_aux,))
 
@@ -200,6 +199,8 @@ class DPGMM(object):
     def update_alpha(self):
         return invgamma.rvs(1, 1)
 
+    # TODO: parallelize sampling of means and covs through components and zs through cells
+    # TODO: avoid singular matrices...
     def fit(self, X, n_iterations=100, n_burnin=50, return_cm=False, print_log_likelihood=False, verbose=False):
         N = X.shape[0]  # number of samples
         d = X.shape[1]  # data dimensionality
