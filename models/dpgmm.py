@@ -261,7 +261,7 @@ class DPGMM(object):
 
         :param n_samples: number of samples to generate
         :param sort: whether to sort samples according to the cluster they belong to
-        :return: X, z: samples and their assignments
+        :return: X: samples and their assignments
         """
         d = self.mu.shape[1]
 
@@ -271,17 +271,17 @@ class DPGMM(object):
         for n in range(n_samples):
             # select one of the clusters
             k = np.random.choice(range(self.K_active), p=self.pi.ravel())
-            z[n] = k
+            self.z[n] = k
 
             # sample an observation
             X[n] = multivariate_normal.rvs(mean=self.mu[k], cov=self.cov[k])
 
         if sort:
-            ind = np.argsort(z)
-            z = z[ind]
+            ind = np.argsort(self.z)
+            self.z = self.z[ind]
             X = X[ind]
 
-        return X, z
+        return X
 
     def set_random_parameters(self, X, K):
         X_mean = np.mean(X, axis=0)
