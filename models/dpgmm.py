@@ -36,9 +36,6 @@ class DPGMM(object):
         # Assignments
         self.z = np.ones((1, ))
 
-        # Confusion matrix
-        self.cm = np.zeros((1, 1))
-
     def log_likelihood(self, X):
         """
         Data log-likelihood
@@ -214,7 +211,7 @@ class DPGMM(object):
         self.z = np.zeros((N, ))
 
         if compute_cm:
-            self.cm = np.ones((N, N))
+            cm = np.ones((N, N))
 
         X_mean = np.mean(X, axis=0)
         X_cov = np.cov(X.T)
@@ -249,10 +246,13 @@ class DPGMM(object):
             self.update_mixture_components(X, mulinha, Sigmalinha, Hlinha, sigmalinha, nk, active_components)
 
             if compute_cm and i > n_burnin:
-                self.update_confusion_matrix()
+                cm = self.update_confusion_matrix(cm)
 
             if print_log_likelihood:
                 print(self.log_likelihood(X))
+
+        if compute_cm:
+            return cm
 
     def sample(self, n_samples=1, sort=False):
         """
@@ -260,6 +260,7 @@ class DPGMM(object):
         they belong to.
 
         :param n_samples: number of samples to generate
+        :param sort: whether to sort samples according to the cluster they belong to
         :return: X, z: samples and their assignments
         """
         d = self.mu.shape[1]
@@ -302,7 +303,7 @@ class DPGMM(object):
         alpha = invgamma.rvs(1, 1)
         self.pi = dirichlet.rvs(alpha / self.K_active * np.ones((self.K_active,))).T
 
-    def update_confusion_matrix(self):
+    def update_confusion_matrix(self, C):
         """
         For each point X[n] with n=1,...,N, count the number of times it was assigned to the same cluster as all the
         other points during the last G iterations of the Gibbs sampling scheme.
@@ -315,4 +316,6 @@ class DPGMM(object):
         for n1 in range(N):
             for n2 in range(N):
                 if self.z[n2] == self.z[n1]:
-                    self.cm[n1, n2] += 1
+                    C[n1, n2] += 1
+
+        return C
