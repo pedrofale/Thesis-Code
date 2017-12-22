@@ -314,8 +314,9 @@ class DPGMM(object):
         N = C.shape[0]
 
         for n1 in range(N):
-            for n2 in range(N):
+            for n2 in range(n1, N):
                 if self.z[n2] == self.z[n1]:
                     C[n1, n2] += 1
+                    C[n2, n1] += 1
 
         return C
