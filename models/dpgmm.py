@@ -311,7 +311,7 @@ class DPGMM(object):
         This only makes sense if the true grouped X[n]s are close to each other: X[0], X[1] and X[2] in one cluster,
         X[3],...,X[7] in another cluster and X[7],...,X[-1] in another, for example.
         """
-        N = self.cm.shape[0]
+        N = C.shape[0]
 
         for n1 in range(N):
             for n2 in range(N):
