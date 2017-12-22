@@ -126,7 +126,7 @@ class Biscuit(DPGMM):
                 self.beta[n] = np.abs(self.max_beta - invgamma.rvs(omega_p, 1. / omega_p))
 
     def fit(self, X, n_iterations=100, n_burnin=50, phi_hyperparams=[0, 1], beta_hyperparams=[1, 1],
-            compute_cm=False, print_log_likelihood=False, verbose=False):
+            return_cm=False, print_log_likelihood=False, verbose=False):
 
         N = X.shape[0]  # number of samples
         d = X.shape[1]  # data dimensionality
@@ -144,7 +144,7 @@ class Biscuit(DPGMM):
         self.phi = np.zeros((N, ))
         self.beta = np.zeros((N, ))
 
-        if compute_cm:
+        if return_cm:
             cm = np.ones((N, N))
 
         X_mean = np.mean(X, axis=0)
@@ -187,13 +187,13 @@ class Biscuit(DPGMM):
             self.add_new_components(active_components, d)
             nk = self.remove_empty_components(active_components, nk)  # The parameter vectors are now of length K_active
 
-            if compute_cm and i > n_burnin:
+            if return_cm and i > n_burnin:
                 self.update_confusion_matrix(cm)
 
             if print_log_likelihood:
                 print(self.log_likelihood(X))
 
-        if compute_cm:
+        if return_cm:
             return cm
 
     def sample(self, n_samples=1, sort=False):
