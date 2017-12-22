@@ -172,10 +172,6 @@ class Biscuit(DPGMM):
             alpha = self.update_alpha()
             self.update_pi(alpha, nk)
 
-            self.update_mixture_components(X, mulinha, Sigmalinha, Hlinha, sigmalinha, nk, active_components)
-
-            self.update_cell_scalings(X, N, d, ups, delta_sq, omega, theta, active_components)
-
             # the hyperparameters are the same for all mixture components
             mulinha, Sigmalinha, Hlinha, sigmalinha = self.update_hyperparameters(X_mean, X_cov_inv, d,
                                                                                   mulinha, Sigmalinha, Hlinha,
@@ -186,6 +182,10 @@ class Biscuit(DPGMM):
             active_components = self.get_active_components(nk)
             self.add_new_components(active_components, d)
             nk = self.remove_empty_components(active_components, nk)  # The parameter vectors are now of length K_active
+
+            self.update_mixture_components(X, mulinha, Sigmalinha, Hlinha, sigmalinha, nk, active_components)
+
+            self.update_cell_scalings(X, N, d, ups, delta_sq, omega, theta, active_components)
 
             if return_cm and i > n_burnin:
                 self.update_confusion_matrix(cm)
