@@ -63,6 +63,8 @@ class DPGMM(object):
     def sample_prior_mixture_components(self, mulinha, Sigmalinha, Hlinha, sigmalinha, d, nsamples=1):
         mu = multivariate_normal.rvs(mean=mulinha, cov=Sigmalinha, size=nsamples).reshape(nsamples, d)
         cov = wishart.rvs(df=sigmalinha, scale=Hlinha, size=nsamples).reshape(nsamples, d, d)
+        while np.all(np.linalg.eigvals(cov) > 0) is False:
+            cov = wishart.rvs(df=sigmalinha, scale=Hlinha, size=nsamples).reshape(nsamples, d, d)
         cov_inv = np.linalg.inv(cov)
         return mu, cov_inv, cov
 
