@@ -277,6 +277,7 @@ class DPGMM(object):
 
         if sort:
             ind = np.argsort(z)
+            z = z[ind]
             X = X[ind]
 
         return X, z
