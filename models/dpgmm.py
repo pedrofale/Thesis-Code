@@ -265,7 +265,7 @@ class DPGMM(object):
         """
         d = self.mu.shape[1]
 
-        z = np.ones((n_samples,))
+        self.z = np.ones((n_samples,))
         X = np.zeros((n_samples, d))
 
         for n in range(n_samples):
