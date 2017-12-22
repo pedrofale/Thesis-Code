@@ -144,6 +144,9 @@ class Biscuit(DPGMM):
         self.phi = np.zeros((N, ))
         self.beta = np.zeros((N, ))
 
+        if compute_cm:
+            cm = np.ones((N, N))
+
         X_mean = np.mean(X, axis=0)
         X_cov = np.cov(X.T)
         X_cov_inv = np.linalg.inv(X_cov)
@@ -185,12 +188,15 @@ class Biscuit(DPGMM):
             nk = self.remove_empty_components(active_components, nk)  # The parameter vectors are now of length K_active
 
             if compute_cm and i > n_burnin:
-                self.update_confusion_matrix()
+                self.update_confusion_matrix(cm)
 
             if print_log_likelihood:
                 print(self.log_likelihood(X))
 
-    def sample(self, n_samples=1):
+        if compute_cm:
+            return cm
+
+    def sample(self, n_samples=1, sort=False):
         ups = 0
         delta_sq = 2
         omega = 1
@@ -214,5 +220,10 @@ class Biscuit(DPGMM):
 
             # sample an observation
             X[n] = multivariate_normal.rvs(mean=phi[n] * self.mu[k], cov=beta[n] * self.cov[k])
+
+        if sort:
+            ind = np.argsort(z)
+            z = z[ind]
+            X = X[ind]
 
         return X, z
