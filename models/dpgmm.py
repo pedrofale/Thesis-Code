@@ -36,6 +36,9 @@ class DPGMM(object):
         # Assignments
         self.z = np.ones((1, ))
 
+        # Confusion matrix
+        self.cm = np.zeros((1, 1))
+
     def log_likelihood(self, X):
         """
         Data log-likelihood
@@ -197,7 +200,7 @@ class DPGMM(object):
     def update_alpha(self):
         return invgamma.rvs(1, 1)
 
-    def fit(self, X, n_iterations=100, print_log_likelihood=False, verbose=False):
+    def fit(self, X, n_iterations=100, n_burnin=50, compute_cm=False, print_log_likelihood=False, verbose=False):
         N = X.shape[0]  # number of samples
         d = X.shape[1]  # data dimensionality
 
@@ -209,6 +212,9 @@ class DPGMM(object):
 
         # Assignments
         self.z = np.zeros((N, ))
+
+        if compute_cm:
+            self.cm = np.ones((N, N))
 
         X_mean = np.mean(X, axis=0)
         X_cov = np.cov(X.T)
@@ -224,7 +230,7 @@ class DPGMM(object):
         active_components = self.get_active_components(nk)
         nk = self.remove_empty_components(active_components, nk)
 
-        for _ in tqdm(range(0, n_iterations)):
+        for i in tqdm(range(0, n_iterations)):
             # Sampling from the conditional posteriors
             alpha = self.update_alpha()
 
@@ -241,6 +247,9 @@ class DPGMM(object):
             self.update_pi(alpha, nk)
 
             self.update_mixture_components(X, mulinha, Sigmalinha, Hlinha, sigmalinha, nk, active_components)
+
+            if compute_cm and i > n_burnin:
+                self.update_confusion_matrix()
 
             if print_log_likelihood:
                 print(self.log_likelihood(X))
@@ -280,3 +289,18 @@ class DPGMM(object):
 
         alpha = invgamma.rvs(1, 1)
         self.pi = dirichlet.rvs(alpha / self.K_active * np.ones((self.K_active,))).T
+
+    def update_confusion_matrix(self):
+        """
+        For each point X[n] with n=1,...,N, count the number of times it was assigned to the same cluster as all the
+        other points during the last G iterations of the Gibbs sampling scheme.
+
+        This only makes sense if the true grouped X[n]s are close to each other: X[0], X[1] and X[2] in one cluster,
+        X[3],...,X[7] in another cluster and X[7],...,X[-1] in another, for example.
+        """
+        N = self.cm.shape[0]
+
+        for n1 in range(N):
+            for n2 in range(N):
+                if self.z[n2] == self.z[n1]:
+                    self.cm[n1, n2] += 1
