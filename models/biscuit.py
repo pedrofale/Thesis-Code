@@ -12,7 +12,7 @@ from scipy.stats import multivariate_normal, wishart, invgamma, norm
 from tqdm import tqdm
 
 
-class Biscuit(DPGMM):
+class BISCUIT(DPGMM):
     """
     This class allows the fitting of a Hierarchical Conditionally Conjugate Dirichlet Process Mixture Model with
     cell-specific scalings.
