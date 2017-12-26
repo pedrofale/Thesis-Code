@@ -61,12 +61,20 @@ class BISCUIT(DPGMM):
     def update_z_inf(self, X, X_mean, X_cov, d, N, nk, alpha, active_components):
         mulinha_, Sigmalinha_, Hlinha_, sigmalinha_ = self.sample_prior_hyperparameters(X_mean, X_cov, d)
         for n in range(N):
-            if nk[int(self.z[n])] == 1:
-                self.z[n] = np.random.choice(range(self.K_active, self.K_active + self.n_aux))
-                continue
+            k = int(self.z[n])
 
             means, covariance_invs, covariances = self.sample_prior_mixture_components(mulinha_, Sigmalinha_, Hlinha_,
-                                                                          sigmalinha_, d, nsamples=self.n_aux)
+                                                                                       sigmalinha_, d,
+                                                                                       nsamples=self.n_aux)
+
+            if nk[int(self.z[n])] == 1:
+                if nk[k] == 1:
+                    self.mu[k] = means[0]
+                    self.cov[k] = covariances[0]
+                    self.cov_inv[k] = covariance_invs[0]
+                    # self.z[n] = np.random.choice(range(self.K_active, self.K_active + self.n_aux))
+
+
             # avoid singular matrices!
             while np.all(np.linalg.eigvals(self.beta[n] * covariances[0]) > 0) is False:
                 mulinha_, Sigmalinha_, Hlinha_, sigmalinha_ = self.sample_prior_hyperparameters(X_mean, X_cov, d)
