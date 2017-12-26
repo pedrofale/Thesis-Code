@@ -42,7 +42,7 @@ class BISCUIT(DPGMM):
 
         Sigmalinha_inv = np.linalg.inv(Sigmalinha)
         for k in range(K):
-            k_inds = np.argwhere(self.z == active_components[k]).ravel()
+            k_inds = np.argwhere(self.z == k).ravel()
             X_k = X[k_inds]  # all the points in current cluster k
             phi_k = self.phi[k_inds]
             phi_k = phi_k.reshape(len(phi_k), -1)
@@ -61,7 +61,7 @@ class BISCUIT(DPGMM):
     def update_z_inf(self, X, X_mean, X_cov, d, N, nk, alpha, active_components):
         mulinha_, Sigmalinha_, Hlinha_, sigmalinha_ = self.sample_prior_hyperparameters(X_mean, X_cov, d)
         for n in range(N):
-            if nk[np.argwhere(active_components == self.z[n])] == 1:
+            if nk[int(self.z[n])] == 1:
                 self.z[n] = np.random.choice(range(self.K_active, self.K_active + self.n_aux))
                 continue
 
@@ -92,7 +92,7 @@ class BISCUIT(DPGMM):
 
     def update_cell_scalings(self, X, N, d, ups, delta_sq, omega, theta, active):
         for n in range(N):
-            k = np.argwhere(active == self.z[n])[0][0]
+            k = int(self.z[n])
 
             # Update phi
             A = 1. / np.sqrt(self.beta[n] * np.abs(self.cov_inv[k]))
@@ -164,6 +164,8 @@ class BISCUIT(DPGMM):
         nk = self.update_counts()
         active_components = self.get_active_components(nk)
         nk = self.remove_empty_components(active_components, nk)
+        # we must now assign z's according to the active components
+        self.update_active_z(active_components)
         # The parameter vectors are now of length self.K_active
         self.sample_prior_cell_scalings(ups, delta_sq, omega, theta, N)
 
@@ -182,6 +184,8 @@ class BISCUIT(DPGMM):
             active_components = self.get_active_components(nk)
             self.add_new_components(active_components, d)
             nk = self.remove_empty_components(active_components, nk)  # The parameter vectors are now of length K_active
+            # we must now assign z's according to the active components
+            self.update_active_z(active_components)
 
             self.update_mixture_components(X, mulinha, Sigmalinha, Hlinha, sigmalinha, nk, active_components)
 
