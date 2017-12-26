@@ -11,7 +11,7 @@ from tqdm import tqdm as tqdm
 
 from utils.scipy_utils import matrix_is_well_conditioned
 
-
+# TODO: enforce diagonal covariance matrices to reduce complexity
 class DPGMM(object):
     """
     This class allows the fitting of a Hierarchical Conditionally Conjugate Dirichlet Process Mixture Model with
@@ -22,7 +22,7 @@ class DPGMM(object):
     :param K_init: initial number of clusters
     :param K: maximum number of clusters
     """
-    def __init__(self, n_aux=1, K=20, K_init=1,):
+    def __init__(self, n_aux=1, K=20, K_init=1, diag=False):
         self.n_aux = n_aux
         self.K = K
 
@@ -83,7 +83,7 @@ class DPGMM(object):
         K = self.K_active
 
         for k in range(K):  # update all K_active components
-            X_k = X[np.argwhere(self.z == active_components[k]).ravel()]  # all the points in current cluster k
+            X_k = X[np.argwhere(self.z == k).ravel()]  # all the points in current cluster k
 
             Sigmaklinha_inv = np.linalg.inv(Sigmalinha) + nk[k] * self.cov_inv[k]
             Sigmaklinha = np.linalg.inv(Sigmaklinha_inv)
@@ -117,7 +117,7 @@ class DPGMM(object):
         return mulinha, Sigmalinha, Hlinha, sigmalinha
 
     def cluster_probs_at_point(self, x):
-        probs = [(self.pi[k] * multivariate_normal.pdf(x, mean=self.mu[k], cov=self.cov_inv[k])) for k in
+        probs = [(self.pi[k] * multivariate_normal.pdf(x, mean=self.mu[k], cov=self.cov[k])) for k in
                  range(self.K_active)]
         probs = probs / np.sum(probs)
         return probs
@@ -130,7 +130,7 @@ class DPGMM(object):
     def update_z_inf(self, X, X_mean, X_cov, d, N, nk, alpha, active_components):
         mulinha_, Sigmalinha_, Hlinha_, sigmalinha_ = self.sample_prior_hyperparameters(X_mean, X_cov, d)
         for n in range(N):
-            if nk[np.argwhere(active_components == self.z[n])] == 1:
+            if nk[int(self.z[n])] == 1:
                 self.z[n] = np.random.choice(range(self.K_active, self.K_active + self.n_aux))
                 continue
 
@@ -199,8 +199,11 @@ class DPGMM(object):
     def update_alpha(self):
         return invgamma.rvs(1, 1)
 
+    def update_active_z(self, active):
+        for i in range(len(active)):
+            self.z[self.z == active[i]] = i
+
     # TODO: parallelize sampling of means and covs through components and zs through cells
-    # TODO: avoid singular matrices...
     def fit(self, X, n_iterations=100, n_burnin=50, return_cm=False, print_log_likelihood=False, verbose=False):
         N = X.shape[0]  # number of samples
         d = X.shape[1]  # data dimensionality
@@ -230,10 +233,14 @@ class DPGMM(object):
         nk = self.update_counts()
         active_components = self.get_active_components(nk)
         nk = self.remove_empty_components(active_components, nk)
+        # we must now assign z's according to the active components
+        self.update_active_z(active_components)
 
         for i in tqdm(range(0, n_iterations)):
             # Sampling from the conditional posteriors
             alpha = self.update_alpha()
+
+            self.update_pi(alpha, nk)
 
             # the hyperparameters are the same for all mixture components
             mulinha, Sigmalinha, Hlinha, sigmalinha = self.update_hyperparameters(X_mean, X_cov_inv, d, mulinha,
@@ -244,8 +251,8 @@ class DPGMM(object):
             active_components = self.get_active_components(nk)
             self.add_new_components(active_components, d)
             nk = self.remove_empty_components(active_components, nk)  # The parameter vectors are now of length K_active
-
-            self.update_pi(alpha, nk)
+            # we must now assign z's according to the active components
+            self.update_active_z(active_components)
 
             self.update_mixture_components(X, mulinha, Sigmalinha, Hlinha, sigmalinha, nk, active_components)
 
