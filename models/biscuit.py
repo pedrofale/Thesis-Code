@@ -23,14 +23,14 @@ class BISCUIT(DPGMM):
         DPGMM.__init__(self, **kwargs)
 
         # Cell-specific scaling parameters
-        self.phi = 1
-        self.beta = 1
+        self.phi = np.ones((1, ))
+        self.beta = np.ones((1, ))
 
         # Identifiability constraints for scaling parameters
-        self.min_phi = 1
-        self.max_phi = 1
-        self.min_beta = 1
-        self.max_beta = 1
+        self.min_phi = 0.5
+        self.max_phi = 1.5
+        self.min_beta = 0.5
+        self.max_beta = 1.5
 
     def sample_prior_cell_scalings(self, ups, delta_sq, omega, theta, N):
         self.phi = norm.rvs(ups, delta_sq, size=N)
@@ -208,9 +208,9 @@ class BISCUIT(DPGMM):
         if return_cm:
             return cm
 
-    def sample(self, n_samples=1, sort=False):
+    def sample(self, n_samples=1, sort=False, return_unscaled=False):
         ups = 0
-        delta_sq = 2
+        delta_sq = 1
         omega = 1
         theta = 1
 
@@ -220,6 +220,7 @@ class BISCUIT(DPGMM):
         phi = np.ones((n_samples,))
         beta = np.ones((n_samples,))
         X = np.zeros((n_samples, d))
+        scaled_X = np.zeros((n_samples, d))
 
         for n in range(n_samples):
             # select one of the clusters
@@ -231,11 +232,16 @@ class BISCUIT(DPGMM):
             beta[n] = invgamma.rvs(omega, theta)
 
             # sample an observation
-            X[n] = multivariate_normal.rvs(mean=phi[n] * self.mu[k], cov=beta[n] * self.cov[k])
+            X[n] = multivariate_normal.rvs(mean=self.mu[k], cov=self.cov[k])
+            scaled_X[n] = multivariate_normal.rvs(mean=phi[n] * self.mu[k], cov=beta[n] * self.cov[k])
 
         if sort:
             ind = np.argsort(self.z)
             self.z = self.z[ind]
+            scaled_X = scaled_X[ind]
             X = X[ind]
 
-        return X
+        if return_unscaled:
+            return scaled_X, X
+
+        return scaled_X
