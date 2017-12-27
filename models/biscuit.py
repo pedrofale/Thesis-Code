@@ -217,8 +217,8 @@ class BISCUIT(DPGMM):
         d = self.mu.shape[1]
 
         self.z = np.ones((n_samples,))
-        phi = np.ones((n_samples,))
-        beta = np.ones((n_samples,))
+        self.phi = np.ones((n_samples,))
+        self.beta = np.ones((n_samples,))
         X = np.zeros((n_samples, d))
         scaled_X = np.zeros((n_samples, d))
 
@@ -228,12 +228,12 @@ class BISCUIT(DPGMM):
             self.z[n] = k
 
             # sample scaling parameters
-            phi[n] = norm.rvs(ups, delta_sq)
-            beta[n] = invgamma.rvs(omega, theta)
+            self.phi[n] = norm.rvs(ups, delta_sq)
+            self.beta[n] = invgamma.rvs(omega, theta)
 
             # sample an observation
             X[n] = multivariate_normal.rvs(mean=self.mu[k], cov=self.cov[k])
-            scaled_X[n] = multivariate_normal.rvs(mean=phi[n] * self.mu[k], cov=beta[n] * self.cov[k])
+            scaled_X[n] = multivariate_normal.rvs(mean=self.phi[n] * self.mu[k], cov=self.beta[n] * self.cov[k])
 
         if sort:
             ind = np.argsort(self.z)
