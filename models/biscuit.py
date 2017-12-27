@@ -27,10 +27,10 @@ class BISCUIT(DPGMM):
         self.beta = np.ones((1, ))
 
         # Identifiability constraints for scaling parameters
-        self.min_phi = 0.5
+        self.min_phi = -1.5
         self.max_phi = 1.5
-        self.min_beta = 0.5
-        self.max_beta = 1.5
+        self.min_beta = 0.
+        self.max_beta = 20.
 
     def sample_prior_cell_scalings(self, ups, delta_sq, omega, theta, N):
         self.phi = norm.rvs(ups, delta_sq, size=N)
@@ -217,8 +217,9 @@ class BISCUIT(DPGMM):
         d = self.mu.shape[1]
 
         self.z = np.ones((n_samples,))
-        self.phi = np.ones((n_samples,))
-        self.beta = np.ones((n_samples,))
+        if random_scalings:
+            self.phi = np.ones((n_samples,))
+            self.beta = np.ones((n_samples,))
         X = np.zeros((n_samples, d))
         scaled_X = np.zeros((n_samples, d))
 
