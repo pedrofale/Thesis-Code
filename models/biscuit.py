@@ -208,7 +208,7 @@ class BISCUIT(DPGMM):
         if return_cm:
             return cm
 
-    def sample(self, n_samples=1, sort=False, return_unscaled=False):
+    def sample(self, n_samples=1, sort=False, return_unscaled=False, random_scalings=True):
         ups = 0
         delta_sq = 1
         omega = 1
@@ -227,9 +227,10 @@ class BISCUIT(DPGMM):
             k = np.random.choice(range(self.K_active), p=self.pi.ravel())
             self.z[n] = k
 
-            # sample scaling parameters
-            self.phi[n] = norm.rvs(ups, delta_sq)
-            self.beta[n] = invgamma.rvs(omega, theta)
+            if random_scalings:
+                # sample scaling parameters
+                self.phi[n] = norm.rvs(ups, delta_sq)
+                self.beta[n] = invgamma.rvs(omega, theta)
 
             # sample an observation
             X[n] = multivariate_normal.rvs(mean=self.mu[k], cov=self.cov[k])
